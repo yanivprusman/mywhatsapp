@@ -64,6 +64,7 @@ import com.automatelinux.mywhatsapp.ui.ImageCache
 import com.automatelinux.mywhatsapp.ui.LocalApi
 import com.automatelinux.mywhatsapp.ui.LocalImages
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.collectAsState
 import com.automatelinux.mywhatsapp.ui.BarIcon
 import com.automatelinux.mywhatsapp.ui.CallsTab
 import com.automatelinux.mywhatsapp.ui.ChatsTab
@@ -118,9 +119,18 @@ fun App(config: AppConfig) {
         var chatsError by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(top == null) {
             while (top == null) {
-                try { chats = api.chats(); chatsError = null } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
+                try { chats = api.chats(Seen.all()); chatsError = null } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
                 delay(15_000)
             }
+        }
+        // A tapped notification names a chat: open it on its Wanted posts.
+        val openJid by Launch.openChat.collectAsState()
+        LaunchedEffect(openJid, chats) {
+            val jid = openJid ?: return@LaunchedEffect
+            val chat = chats?.firstOrNull { it.jid == jid } ?: return@LaunchedEffect
+            stack.clear(); tab = 0
+            stack.add(Screen.Conversation(chat, "wanted"))
+            Launch.openChat.value = null
         }
         if (top != null) {
             SubScreen(top, onBack = { stack.removeAt(stack.lastIndex) }, open = open)
@@ -192,7 +202,7 @@ private fun SubScreen(screen: Screen, onBack: () -> Unit, open: (Screen) -> Unit
     val c = Wa.colors
     Column(Modifier.fillMaxSize().background(c.background)) {
         when (screen) {
-            is Screen.Conversation -> ConversationScreen(screen.chat, onBack, open)
+            is Screen.Conversation -> ConversationScreen(screen.chat, screen.filter, onBack, open)
             Screen.SelectContact -> {
                 SubTopBar("Select contact", "0 contacts", onBack) {
                     BarIcon(Icons.Filled.Search, "Search", "search-contacts") { open(Screen.Empty("Search contacts", "search")) }

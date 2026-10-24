@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -95,10 +96,29 @@ fun ChatRow(chat: Chat, onClick: () -> Unit) {
                     chat.name, color = c.text, fontSize = 17.sp, fontWeight = FontWeight.Medium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
-                chat.last?.let { Text(listStamp(it.ts), color = c.textSecondary, fontSize = 12.sp) }
+                chat.last?.let {
+                    Text(
+                        listStamp(it.ts), color = if (chat.unread > 0) c.brand else c.textSecondary, fontSize = 12.sp,
+                        fontWeight = if (chat.unread > 0) FontWeight.Medium else FontWeight.Normal,
+                    )
+                }
             }
             Spacer(Modifier.size(2.dp))
-            MessagePreview(chat.last)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { MessagePreview(chat.last) }
+                if (chat.unread > 0) {
+                    Box(
+                        Modifier.padding(start = 8.dp).sizeIn(minWidth = 22.dp, minHeight = 22.dp)
+                            .clip(CircleShape).background(c.brand).padding(horizontal = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (chat.unread > 999) "999+" else chat.unread.toString(),
+                            color = c.onFab, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
         }
     }
 }

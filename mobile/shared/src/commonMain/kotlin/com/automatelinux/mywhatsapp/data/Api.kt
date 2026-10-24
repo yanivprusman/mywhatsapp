@@ -24,7 +24,10 @@ data class Message(
 )
 
 @Serializable
-data class Chat(val jid: String, val name: String, val isGroup: Boolean, val last: Message? = null)
+data class Chat(val jid: String, val name: String, val isGroup: Boolean, val last: Message? = null, val unread: Int = 0)
+
+@Serializable data class WantedPost(val chatJid: String, val chatName: String, val message: Message)
+@Serializable data class WantedResponse(val posts: List<WantedPost>, val latest: String)
 
 @Serializable private data class ChatsResponse(val chats: List<Chat>)
 @Serializable data class MessagesPage(
@@ -38,14 +41,29 @@ data class Chat(val jid: String, val name: String, val isGroup: Boolean, val las
 class Api(private val baseUrl: String, private val token: String) {
     private val json = Json { ignoreUnknownKeys = true }
     private fun url(path: String) = baseUrl.trimEnd('/') + path
-    private fun enc(s: String) = s.replace("@", "%40").replace("+", "%2B").replace(":", "%3A")
+    private fun enc(s: String): String = buildString {
+        for (b in s.encodeToByteArray()) {
+            val c = b.toInt().toChar()
+            if (c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9' || c in "-._~") append(c)
+            else append('%').append((b.toInt() and 0xff).toString(16).uppercase().padStart(2, '0'))
+        }
+    }
 
     init {
         require(token.isNotBlank()) { "API_TOKEN is missing — set it in mobile/.env and rebuild" }
     }
 
-    suspend fun chats(): List<Chat> =
-        json.decodeFromString<ChatsResponse>(httpRequest("GET", url("/api/chats"), token, null).decodeToString()).chats
+    /** [seen]: newest message timestamp the phone has shown, per chat — the server counts unread after it. */
+    suspend fun chats(seen: Map<String, String>): List<Chat> {
+        val q = "/api/chats?seen=" + enc(json.encodeToString(seen))
+        return json.decodeFromString<ChatsResponse>(httpRequest("GET", url(q), token, null).decodeToString()).chats
+    }
+
+    /** New Wanted posts after [after]; with null, only `latest` (where a fresh watcher starts). */
+    suspend fun wanted(after: String?): WantedResponse {
+        val q = "/api/wanted" + (if (after != null) "?after=${enc(after)}" else "")
+        return json.decodeFromString(httpRequest("GET", url(q), token, null).decodeToString())
+    }
 
     suspend fun messages(jid: String, filter: String = "all", before: String? = null, after: String? = null, limit: Int = 50): MessagesPage {
         var q = "/api/chats/${enc(jid)}/messages?limit=$limit&filter=$filter"

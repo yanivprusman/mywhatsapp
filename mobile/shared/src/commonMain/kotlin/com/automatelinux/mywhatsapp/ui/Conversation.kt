@@ -84,6 +84,7 @@ import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
+import com.automatelinux.mywhatsapp.Seen
 import com.automatelinux.mywhatsapp.decodeImage
 import com.automatelinux.mywhatsapp.ui.theme.Wa
 import kotlinx.coroutines.delay
@@ -91,7 +92,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
 @Composable
-fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
+fun ConversationScreen(chat: Chat, initialFilter: String, onBack: () -> Unit, open: (Screen) -> Unit) {
     val c = Wa.colors
     val api = LocalApi.current
     val scope = rememberCoroutineScope()
@@ -101,7 +102,8 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var hint by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf("all") }
+    var filter by remember { mutableStateOf(initialFilter) }
+    var sheetFor by remember { mutableStateOf<Message?>(null) }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var loaded by remember { mutableStateOf(false) }
     // A fresh list per filter: each filter opens at its newest message.
@@ -115,6 +117,9 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
             val page = api.messages(chat.jid, filter)
             messages.addAll(page.messages); hasMore = page.hasMore; error = null
             if (filter == "all") page.counts?.let { counts = it }
+            // Counts come with every first page; keep the All-view ones when opening filtered.
+            if (counts.isEmpty()) page.counts?.let { counts = it }
+            if (filter == "all") page.messages.firstOrNull()?.let { Seen.mark(chat.jid, it.ts) }
         } catch (e: Exception) { error = e.message }
         loaded = true
         while (true) {
@@ -126,6 +131,7 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
                     // The bridge's echo replaces our optimistic copy of the same text.
                     fresh.forEach { f -> messages.removeAll { it.pending && it.text == f.text } }
                     messages.addAll(0, fresh.filter { f -> messages.none { it.id == f.id } })
+                    fresh.maxByOrNull { it.ts }?.let { Seen.mark(chat.jid, it.ts) }
                     if (list.firstVisibleItemIndex <= 2) list.animateScrollToItem(0)
                 }
             } catch (_: Exception) { /* next tick retries; the first-load error is the visible one */ }
@@ -194,7 +200,7 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
                         val day = localTime(m.ts).date
                         val firstOfRun = older == null || older.fromMe != m.fromMe ||
                             older.sender != m.sender || localTime(older.ts).date != day
-                        item(key = m.id) { Bubble(chat, m, firstOfRun, showKind = filter == "all") }
+                        item(key = m.id) { Bubble(chat, m, firstOfRun, showKind = filter == "all") { sheetFor = m } }
                         if (older == null || localTime(older.ts).date != day) {
                             item(key = "day-$day-${m.id}") { DateChip(dayLabel(day)) }
                         }
@@ -221,6 +227,7 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
             onUnavailable = { what -> hint = "$what isn't available yet — text only for now" },
         )
     }
+    sheetFor?.let { m -> SenderSheet(chat, m, onDismiss = { sheetFor = null }, onResult = { hint = it }) }
 }
 
 @Composable
@@ -347,7 +354,7 @@ private fun linkified(text: String): AnnotatedString {
 }
 
 @Composable
-private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolean) {
+private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolean, onTap: () -> Unit) {
     val c = Wa.colors
     val shape = bubbleShape(m.fromMe, firstOfRun, r = 22f, t = 24f)
     Row(
@@ -358,10 +365,12 @@ private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolea
         horizontalArrangement = if (m.fromMe) Arrangement.End else Arrangement.Start,
     ) {
         if (!m.fromMe && chat.isGroup) {
-            if (firstOfRun) DefaultAvatar(30.dp) else Spacer(Modifier.width(30.dp))
+            if (firstOfRun) Box(Modifier.clip(CircleShape).clickable(onClick = onTap)) { DefaultAvatar(30.dp) }
+            else Spacer(Modifier.width(30.dp))
         }
         Column(
             Modifier.clip(shape).background(if (m.fromMe) c.bubbleOut else c.bubbleIn)
+                .clickable(onClick = onTap).testTag("message-card")
                 .padding(start = if (m.fromMe) 4.dp else 13.dp, end = if (m.fromMe) 13.dp else 4.dp, top = 4.dp, bottom = 4.dp),
         ) {
             if (!m.fromMe && chat.isGroup && firstOfRun) {

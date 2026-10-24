@@ -40,6 +40,9 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.WavingHand
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -115,7 +118,8 @@ fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit) {
         val shown = (chats ?: emptyList()).filter { ch ->
             (query.isBlank() || ch.name.contains(query.trim(), ignoreCase = true)) && when (filter) {
                 "Groups" -> ch.isGroup
-                "Unread", "Favourites" -> false
+                "Unread" -> ch.unread > 0
+                "Favourites" -> false
                 else -> true
             }
         }
@@ -212,6 +216,7 @@ fun ToolsTab(open: (Screen) -> Unit) {
         }
         item { Box(Modifier.fillMaxWidth().height(1.dp).background(c.divider)) }
         item { SectionHeader("My tools") }
+        item { WantedAlertsRow() }
         item { PlainIconRow(Icons.Outlined.MergeType, "Merged groups", "Combine groups into one conversation", "tool-merged-groups") { open(Screen.Empty("Merged groups", "merge")) } }
         item { PlainIconRow(Icons.Outlined.FilterAlt, "Message filters", "Show only the messages you care about", "tool-message-filters") { open(Screen.Empty("Message filters", "filter")) } }
         item { PlainIconRow(Icons.Outlined.MonitorHeart, "Diagnostics", "Connection and delivery health", "tool-diagnostics") { open(Screen.Empty("Diagnostics", "diagnostics")) } }
@@ -251,5 +256,37 @@ fun SelectContactScreen(open: (Screen) -> Unit) {
         item { ListRow("New community", null, "new-community", leading = { IconCircle(Icons.Outlined.Explore, c.brand, c.onFab) }) { open(Screen.Empty("New community", "community")) } }
         item { SectionHeader("Contacts on MyWhatsApp") }
         item { Text("No contacts yet.", color = c.textSecondary, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+    }
+}
+
+@Composable
+private fun WantedAlertsRow() {
+    val c = Wa.colors
+    var on by rememberSaveable { mutableStateOf(com.automatelinux.mywhatsapp.Alerts.enabled) }
+    Row(
+        Modifier.fillMaxWidth().clickable { on = !on; com.automatelinux.mywhatsapp.Alerts.enabled = on }
+            .testTag("tool-wanted-alerts").padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.NotificationsActive, null, tint = c.textSecondary, modifier = Modifier.size(24.dp))
+        }
+        Column(Modifier.padding(start = 16.dp).weight(1f)) {
+            Text("Wanted alerts", color = c.text, fontSize = 17.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                if (on) "A notification for every new job post" else "Off — no notifications",
+                color = c.textSecondary, fontSize = 14.sp,
+            )
+        }
+        Switch(
+            checked = on,
+            onCheckedChange = { on = it; com.automatelinux.mywhatsapp.Alerts.enabled = it },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = c.onFab, checkedTrackColor = c.brand,
+                uncheckedThumbColor = c.textSecondary, uncheckedTrackColor = c.chipBg, uncheckedBorderColor = c.textSecondary,
+            ),
+            modifier = Modifier.testTag("wanted-alerts-switch"),
+        )
     }
 }
