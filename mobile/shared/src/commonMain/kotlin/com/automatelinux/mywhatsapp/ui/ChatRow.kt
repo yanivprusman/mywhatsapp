@@ -75,13 +75,14 @@ fun mediaIcon(type: String): ImageVector? = when (type) {
     else -> null
 }
 
-/** First line of the last message, as WhatsApp previews it. */
+/** First line of the last message, as WhatsApp previews it. [filter]: the chat shows only those, so its last line is one. */
 @Composable
-fun MessagePreview(m: Message?) {
+fun MessagePreview(m: Message?, filter: String = "all") {
     val c = Wa.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (m == null) {
-            Text("No messages yet", color = c.textSecondary, fontSize = 15.sp)
+            val none = if (filter == "all") "No messages yet" else "No ${filterLabel(filter).lowercase()} messages yet"
+            Text(none, color = c.textSecondary, fontSize = 15.sp)
             return@Row
         }
         if (m.fromMe) {
@@ -122,7 +123,7 @@ fun ChatRow(chat: Chat, onClick: () -> Unit) {
             }
             Spacer(Modifier.size(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { MessagePreview(chat.last) }
+                Box(Modifier.weight(1f)) { MessagePreview(chat.last, chat.filter) }
                 if (chat.unread > 0) {
                     Box(
                         Modifier.padding(start = 8.dp).sizeIn(minWidth = 22.dp, minHeight = 22.dp)

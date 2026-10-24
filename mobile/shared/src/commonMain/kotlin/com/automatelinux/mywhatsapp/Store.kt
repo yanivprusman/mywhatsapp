@@ -41,6 +41,9 @@ object Seen {
 object ChatFilter {
     fun get(jid: String): String = appSettings().getString("filter:$jid", "all")
     fun set(jid: String, filter: String) = appSettings().putString("filter:$jid", filter)
+    /** Every chat not on All — the chat list asks for their last line and unread count under it. */
+    fun all(): Map<String, String> = appSettings().keys.filter { it.startsWith("filter:") }
+        .associate { it.removePrefix("filter:") to get(it.removePrefix("filter:")) }.filterValues { it != "all" }
 }
 
 /** Notifications for new Wanted posts. On by default; the Android side starts/stops the watcher. */

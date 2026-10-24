@@ -131,7 +131,8 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
             if (filter == "all" || reload > 0) page.counts?.let { counts = it }
             // Counts come with every first page; keep the All-view ones when opening filtered.
             if (counts.isEmpty()) page.counts?.let { counts = it }
-            if (filter == "all") page.messages.firstOrNull()?.let { Seen.mark(chat.jid, it.ts) }
+            // Under a filter too: the list's unread count is of that filter's messages, so what's shown is what's seen.
+            page.messages.firstOrNull()?.let { Seen.mark(chat.jid, it.ts) }
         } catch (e: Exception) { error = e.message }
         loaded = true
         while (true) {

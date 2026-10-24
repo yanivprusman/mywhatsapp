@@ -38,6 +38,7 @@ data class Chat(
     val canSend: Boolean = false,
     val sources: List<Source> = emptyList(),
     val clearedAt: String? = null, // the chat was cleared up to here; older messages are hidden, not deleted
+    val filter: String = "all",    // the filter it is open on; last + unread are of matching messages only
 )
 
 @Serializable data class Source(val jid: String, val name: String)
@@ -71,9 +72,12 @@ class Api(private val baseUrl: String, private val token: String) {
         require(token.isNotBlank()) { "API_TOKEN is missing — set it in mobile/.env and rebuild" }
     }
 
-    /** [seen]: newest message timestamp the phone has shown, per chat — the server counts unread after it. */
-    suspend fun chats(seen: Map<String, String>): List<Chat> {
-        val q = "/api/chats?seen=" + enc(json.encodeToString(seen))
+    /**
+     * [seen]: newest message timestamp the phone has shown, per chat — the server counts unread after it.
+     * [filters]: the filter each chat is open on — its last line and unread count are of those messages only.
+     */
+    suspend fun chats(seen: Map<String, String>, filters: Map<String, String>): List<Chat> {
+        val q = "/api/chats?seen=" + enc(json.encodeToString(seen)) + "&filters=" + enc(json.encodeToString(filters))
         return json.decodeFromString<ChatsResponse>(httpRequest("GET", url(q), token, null).decodeToString()).chats
     }
 
