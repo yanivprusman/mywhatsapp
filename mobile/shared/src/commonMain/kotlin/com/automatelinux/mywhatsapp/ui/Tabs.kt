@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
@@ -56,6 +57,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.ui.theme.Wa
 
 // Every tab is the real WhatsApp Business layout with zero data behind it.
@@ -64,7 +66,7 @@ import com.automatelinux.mywhatsapp.ui.theme.Wa
 private val chatFilters = listOf("All", "Unread", "Favourites", "Groups")
 
 @Composable
-fun ChatsTab(open: (Screen) -> Unit) {
+fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit) {
     val c = Wa.colors
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
@@ -110,9 +112,19 @@ fun ChatsTab(open: (Screen) -> Unit) {
                 }
             }
         }
-        item {
+        val shown = (chats ?: emptyList()).filter { ch ->
+            (query.isBlank() || ch.name.contains(query.trim(), ignoreCase = true)) && when (filter) {
+                "Groups" -> ch.isGroup
+                "Unread", "Favourites" -> false
+                else -> true
+            }
+        }
+        items(shown, key = { it.jid }) { ch -> ChatRow(ch) { open(Screen.Conversation(ch)) } }
+        if (shown.isEmpty()) item {
             val (icon, title, body) = when {
-                query.isNotBlank() -> Triple(Icons.Filled.Search, "No results", "No chats, contacts or messages found for “$query”.")
+                chats == null && loadError != null -> Triple(Icons.Filled.ErrorOutline, "Can't reach MyWhatsApp's server", loadError)
+                chats == null -> Triple(Icons.AutoMirrored.Outlined.Chat, "Loading chats\u2026", "")
+                query.isNotBlank() -> Triple(Icons.Filled.Search, "No results", "No chats, contacts or messages found for \u201C$query\u201D.")
                 filter == "Unread" -> Triple(Icons.Outlined.MarkChatUnread, "No unread chats", "You're all caught up.")
                 filter == "Favourites" -> Triple(Icons.Outlined.StarBorder, "No favourites yet", "Add chats to Favourites so they're always easy to find.")
                 filter == "Groups" -> Triple(Icons.Outlined.Groups, "No groups yet", "Groups will appear here.")

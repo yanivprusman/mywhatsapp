@@ -11,7 +11,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            App()
+            App(AppConfig(BuildConfig.API_BASE_URL, BuildConfig.API_TOKEN))
         }
     }
 }

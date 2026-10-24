@@ -29,6 +29,18 @@ data class WaColors(
     val divider: Color,
     val iconTint: Color,
     val emptyBadge: Color,     // soft circle behind empty-state icons
+    val chatBg: Color,         // conversation wallpaper
+    val bubbleOut: Color,
+    val bubbleIn: Color,
+    val bubbleMeta: Color,     // time inside a bubble
+    val dateChip: Color,
+    val dateChipText: Color,
+    val notice: Color,         // the yellow encryption notice
+    val noticeText: Color,
+    val link: Color,
+    val tick: Color,           // read ticks
+    val inputBg: Color,
+    val fileCard: Color,       // document card inside a bubble
     val isDark: Boolean,
 )
 
@@ -48,6 +60,18 @@ val LightWa = WaColors(
     divider = Color(0xFFE9EDEF),
     iconTint = Color(0xFF1F2C34),
     emptyBadge = Color(0xFFE7FCE3),
+    chatBg = Color(0xFFEFEAE2),
+    bubbleOut = Color(0xFFD9FDD3),
+    bubbleIn = Color(0xFFFFFFFF),
+    bubbleMeta = Color(0xFF667781),
+    dateChip = Color(0xFFFFFFFF),
+    dateChipText = Color(0xFF54656F),
+    notice = Color(0xFFFFEECD),
+    noticeText = Color(0xFF54656F),
+    link = Color(0xFF027EB5),
+    tick = Color(0xFF53BDEB),
+    inputBg = Color(0xFFFFFFFF),
+    fileCard = Color(0x0F0B141A),
     isDark = false,
 )
 
@@ -67,6 +91,18 @@ val DarkWa = WaColors(
     divider = Color(0xFF222D34),
     iconTint = Color(0xFFE9EDEF),
     emptyBadge = Color(0xFF103529),
+    chatBg = Color(0xFF0B141A),
+    bubbleOut = Color(0xFF144D37),
+    bubbleIn = Color(0xFF202C33),
+    bubbleMeta = Color(0xFF8BA69C),
+    dateChip = Color(0xFF182229),
+    dateChipText = Color(0xFF8696A0),
+    notice = Color(0xFF182229),
+    noticeText = Color(0xFFFFD279),
+    link = Color(0xFF53BDEB),
+    tick = Color(0xFF53BDEB),
+    inputBg = Color(0xFF202C33),
+    fileCard = Color(0x26000000),
     isDark = true,
 )
 

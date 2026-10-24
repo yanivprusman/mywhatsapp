@@ -19,7 +19,9 @@ val gitShortHash = providers.exec {
 val envFile = rootProject.file(".env")
 val envProps = Properties()
 if (envFile.exists()) envFile.inputStream().use { envProps.load(it) }
-val apiBaseUrl = envProps.getProperty("API_BASE_URL", "http://10.7.0.1:3181/")
+val apiBaseUrl = envProps.getProperty("API_BASE_URL", "http://10.7.0.2:3181/")
+// Bearer token for the backend (MYWHATSAPP_API_TOKEN in the server's .env.local).
+val apiToken = envProps.getProperty("API_TOKEN", "")
 
 android {
     namespace = "com.automatelinux.mywhatsapp"
@@ -32,6 +34,7 @@ android {
         versionCode = gitCommitCount
         versionName = "v${gitCommitCount} (${gitShortHash})"
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "API_TOKEN", "\"$apiToken\"")
     }
 
     buildTypes {

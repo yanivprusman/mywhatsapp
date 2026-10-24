@@ -55,6 +55,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import com.automatelinux.mywhatsapp.data.Api
+import com.automatelinux.mywhatsapp.data.Chat
+import com.automatelinux.mywhatsapp.ui.ConversationScreen
+import com.automatelinux.mywhatsapp.ui.ImageCache
+import com.automatelinux.mywhatsapp.ui.LocalApi
+import com.automatelinux.mywhatsapp.ui.LocalImages
+import kotlinx.coroutines.delay
 import com.automatelinux.mywhatsapp.ui.BarIcon
 import com.automatelinux.mywhatsapp.ui.CallsTab
 import com.automatelinux.mywhatsapp.ui.ChatsTab
@@ -86,11 +95,15 @@ private val tabMenus = listOf(
     listOf("Clear call log", "Settings"),
 )
 
+data class AppConfig(val baseUrl: String, val token: String)
+
 // Shared entry composable — rendered by MainActivity on Android and (on a Mac)
 // by ComposeUIViewController on iOS.
 @Composable
-fun App() {
-    AppTheme {
+fun App(config: AppConfig) {
+    val api = remember { Api(config.baseUrl, config.token) }
+    val images = remember { ImageCache() }
+    AppTheme { CompositionLocalProvider(LocalApi provides api, LocalImages provides images) {
         var tab by rememberSaveable { mutableStateOf(0) }
         val stack = remember { mutableStateListOf<Screen>() }
         val open: (Screen) -> Unit = { stack.add(it) }
@@ -101,9 +114,17 @@ fun App() {
         }
 
         val top = stack.lastOrNull()
+        var chats by remember { mutableStateOf<List<Chat>?>(null) }
+        var chatsError by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(top == null) {
+            while (top == null) {
+                try { chats = api.chats(); chatsError = null } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
+                delay(15_000)
+            }
+        }
         if (top != null) {
             SubScreen(top, onBack = { stack.removeAt(stack.lastIndex) }, open = open)
-            return@AppTheme
+            return@CompositionLocalProvider
         }
 
         Column(Modifier.fillMaxSize().background(Wa.colors.background)) {
@@ -121,7 +142,7 @@ fun App() {
             }
             Box(Modifier.weight(1f)) {
                 when (tab) {
-                    0 -> ChatsTab(open)
+                    0 -> ChatsTab(chats, chatsError, open)
                     1 -> UpdatesTab(open)
                     2 -> ToolsTab(open)
                     else -> CallsTab(open)
@@ -130,7 +151,7 @@ fun App() {
             }
             WaBottomNav(tabs, tab) { tab = it }
         }
-    }
+    } }
 }
 
 @Composable
@@ -171,6 +192,7 @@ private fun SubScreen(screen: Screen, onBack: () -> Unit, open: (Screen) -> Unit
     val c = Wa.colors
     Column(Modifier.fillMaxSize().background(c.background)) {
         when (screen) {
+            is Screen.Conversation -> ConversationScreen(screen.chat, onBack, open)
             Screen.SelectContact -> {
                 SubTopBar("Select contact", "0 contacts", onBack) {
                     BarIcon(Icons.Filled.Search, "Search", "search-contacts") { open(Screen.Empty("Search contacts", "search")) }
