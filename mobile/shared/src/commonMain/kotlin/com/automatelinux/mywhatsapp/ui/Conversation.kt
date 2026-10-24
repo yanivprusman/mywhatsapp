@@ -83,7 +83,6 @@ import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.data.Message
 import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -238,7 +237,8 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                     if (!hasMore) item(key = "notice") { EncryptionNotice() }
                 }
             }
-            AnimatedVisibility(
+            // Fully qualified: inside a Column, a bare call resolves to the ColumnScope overload.
+            androidx.compose.animation.AnimatedVisibility(
                 visible = showDate && topDate != null,
                 enter = fadeIn(tween(150)), exit = fadeOut(tween(400)),
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
