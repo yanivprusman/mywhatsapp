@@ -83,6 +83,11 @@ import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.data.Message
 import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.draw.shadow
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
 import com.automatelinux.mywhatsapp.ChatFilter
@@ -193,6 +198,14 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
             onBack, open, onSettings = { showSettings = true },
         )
         val rows = remember(messages.toList()) { buildRows(messages) }
+        // WhatsApp's floating date: the day of the post at the top, shown while you scroll, gone a moment after.
+        val topDate by remember(rows) { derivedStateOf {
+            list.layoutInfo.visibleItemsInfo.maxByOrNull { it.index }?.index?.let { rows.getOrNull(it)?.date }
+        } }
+        var showDate by remember { mutableStateOf(false) }
+        LaunchedEffect(list.isScrollInProgress) {
+            if (list.isScrollInProgress) showDate = true else { delay(1200); showDate = false }
+        }
         Box(Modifier.weight(1f)) {
             when {
                 error != null && messages.isEmpty() -> EmptyState(
@@ -223,6 +236,19 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                         }
                     }
                     if (!hasMore) item(key = "notice") { EncryptionNotice() }
+                }
+            }
+            AnimatedVisibility(
+                visible = showDate && topDate != null,
+                enter = fadeIn(tween(150)), exit = fadeOut(tween(400)),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+            ) {
+                topDate?.let { d ->
+                    Text(
+                        dayLabel(d), color = c.dateChipText, fontSize = 12.5.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.shadow(1.dp, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))
+                            .background(c.dateChip).padding(horizontal = 10.dp, vertical = 5.dp).testTag("floating-date"),
+                    )
                 }
             }
             hint?.let {
