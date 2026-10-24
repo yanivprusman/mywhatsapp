@@ -49,6 +49,18 @@ fun dayLabel(d: LocalDate): String {
     }
 }
 
+/** Compact date for tight spots: "Thu 22 Oct · 2d", "Today · 24 Oct". */
+fun shortDay(d: LocalDate): String {
+    val now = today()
+    val n = now.toEpochDays() - d.toEpochDays()
+    val date = "${d.dayOfMonth} ${months[d.monthNumber - 1].take(3)}" + if (d.year != now.year) " ${d.year % 100}" else ""
+    return when (n) {
+        0 -> "Today · $date"
+        1 -> "Yesterday · $date"
+        else -> "${weekdays[d.dayOfWeek.ordinal].take(3)} $date · ${n}d"
+    }
+}
+
 /** How long ago, in whole days — what matters for a job post. */
 fun daysAgo(d: LocalDate): String {
     val n = today().toEpochDays() - d.toEpochDays()

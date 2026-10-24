@@ -83,7 +83,7 @@ import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.data.Message
 import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
-import com.automatelinux.mywhatsapp.data.daysAgo
+import com.automatelinux.mywhatsapp.data.shortDay
 import androidx.compose.ui.draw.shadow
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
@@ -185,13 +185,13 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
             if (chat.merged) chat.sources.joinToString(" · ") { it.name } else members(messages),
             onBack, open,
         )
-        FilterBar(filter, counts) { filter = it }
         val rows = remember(messages.toList()) { buildRows(messages) }
-        // The date of the post at the top of the screen, kept pinned while you scroll.
+        // The date of the post at the top of the screen, shown in the filter row (it covers nothing there).
         val topDate by remember(rows) { derivedStateOf {
             val top = list.layoutInfo.visibleItemsInfo.maxByOrNull { it.index }?.index
             top?.let { rows.getOrNull(it)?.date }
         } }
+        FilterBar(filter, counts, topDate.takeIf { loaded && rows.isNotEmpty() }) { filter = it }
         Box(Modifier.weight(1f)) {
             when {
                 error != null && messages.isEmpty() -> EmptyState(
@@ -223,9 +223,6 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                     }
                     if (!hasMore) item(key = "notice") { EncryptionNotice() }
                 }
-            }
-            if (loaded && rows.isNotEmpty()) topDate?.let { d ->
-                StickyDate(d, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
             }
             hint?.let {
                 Text(
@@ -293,19 +290,31 @@ private fun members(messages: List<Message>): String {
 }
 
 @Composable
-private fun FilterBar(selected: String, counts: Map<String, Int>, onSelect: (String) -> Unit) {
+private fun FilterBar(selected: String, counts: Map<String, Int>, date: kotlinx.datetime.LocalDate?, onSelect: (String) -> Unit) {
     val c = Wa.colors
-    LazyRow(
+    Row(
         Modifier.fillMaxWidth().background(c.background).padding(bottom = 8.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(chatFilters) { f ->
-            val n = counts[f]
-            FilterChip(
-                if (n != null) "${filterLabel(f)} · $n" else filterLabel(f),
-                selected == f, "chat-filter-$f",
-            ) { onSelect(f) }
+        LazyRow(
+            Modifier.weight(1f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(chatFilters) { f ->
+                val n = counts[f]
+                FilterChip(
+                    if (n != null) "${filterLabel(f)} · $n" else filterLabel(f),
+                    selected == f, "chat-filter-$f",
+                ) { onSelect(f) }
+            }
+        }
+        // The day of the post at the top of the screen — pinned here instead of over the posts.
+        if (date != null) {
+            Text(
+                shortDay(date), color = c.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                maxLines = 1, modifier = Modifier.padding(end = 12.dp).testTag("top-date"),
+            )
         }
     }
 }
@@ -334,19 +343,6 @@ private fun buildRows(messages: List<Message>): List<Row> {
         if (olderDay != day) rows.add(Row.Day(day, m.id))
     }
     return rows
-}
-
-/** Pinned at the top of the chat: the date you are looking at, and how old it is. */
-@Composable
-private fun StickyDate(d: kotlinx.datetime.LocalDate, modifier: Modifier) {
-    val c = Wa.colors
-    val ago = daysAgo(d)
-    Text(
-        if (ago == "today") dayLabel(d) else "${dayLabel(d)} · $ago",
-        color = c.dateChipText, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-        modifier = modifier.shadow(2.dp, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))
-            .background(c.dateChip).padding(horizontal = 12.dp, vertical = 6.dp).testTag("sticky-date"),
-    )
 }
 
 @Composable
