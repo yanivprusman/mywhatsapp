@@ -18,6 +18,7 @@ export const MESSAGE_COLUMNS =
   "(url IS NOT NULL AND url != '' AND media_key IS NOT NULL AND length(media_key) > 0)";
 
 export function toMessage(r: unknown[]): WireMessage {
+  // columns: MESSAGE_COLUMNS (8); callers may append more after them
   return {
     id: String(r[0]),
     text: String(r[1] ?? ""),
