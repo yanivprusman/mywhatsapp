@@ -83,6 +83,8 @@ import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.data.Message
 import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
+import com.automatelinux.mywhatsapp.data.daysAgo
+import androidx.compose.ui.draw.shadow
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
 import com.automatelinux.mywhatsapp.ChatFilter
@@ -184,6 +186,12 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
             onBack, open,
         )
         FilterBar(filter, counts) { filter = it }
+        val rows = remember(messages.toList()) { buildRows(messages) }
+        // The date of the post at the top of the screen, kept pinned while you scroll.
+        val topDate by remember(rows) { derivedStateOf {
+            val top = list.layoutInfo.visibleItemsInfo.maxByOrNull { it.index }?.index
+            top?.let { rows.getOrNull(it)?.date }
+        } }
         Box(Modifier.weight(1f)) {
             when {
                 error != null && messages.isEmpty() -> EmptyState(
@@ -200,16 +208,12 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                     state = list, reverseLayout = true, modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
                 ) {
-                    val n = messages.size
-                    for (i in 0 until n) {
-                        val m = messages[i]
-                        val older = messages.getOrNull(i + 1)
-                        val day = localTime(m.ts).date
-                        val firstOfRun = older == null || older.fromMe != m.fromMe ||
-                            older.sender != m.sender || localTime(older.ts).date != day
-                        item(key = "${m.chatJid}/${m.id}") { Bubble(chat, m, firstOfRun, showKind = filter == "all") { sheetFor = m } }
-                        if (older == null || localTime(older.ts).date != day) {
-                            item(key = "day-$day-${m.id}") { DateChip(dayLabel(day)) }
+                    rows.forEach { r ->
+                        when (r) {
+                            is Row.Msg -> item(key = r.key) {
+                                Bubble(chat, r.m, r.firstOfRun, showKind = filter == "all") { sheetFor = r.m }
+                            }
+                            is Row.Day -> item(key = r.key) { DateChip(dayLabel(r.date)) }
                         }
                     }
                     if (loadingOlder) item(key = "older") {
@@ -219,6 +223,9 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                     }
                     if (!hasMore) item(key = "notice") { EncryptionNotice() }
                 }
+            }
+            if (loaded && rows.isNotEmpty()) topDate?.let { d ->
+                StickyDate(d, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
             }
             hint?.let {
                 Text(
@@ -301,6 +308,45 @@ private fun FilterBar(selected: String, counts: Map<String, Int>, onSelect: (Str
             ) { onSelect(f) }
         }
     }
+}
+
+/** One line of the conversation list, newest first (the list is reverse-laid). */
+private sealed interface Row {
+    val key: String
+    val date: kotlinx.datetime.LocalDate
+    class Msg(val m: Message, val firstOfRun: Boolean, override val date: kotlinx.datetime.LocalDate) : Row {
+        override val key = "${m.chatJid}/${m.id}"
+    }
+    class Day(override val date: kotlinx.datetime.LocalDate, after: String) : Row {
+        override val key = "day-$date-$after"
+    }
+}
+
+private fun buildRows(messages: List<Message>): List<Row> {
+    val rows = ArrayList<Row>(messages.size + 32)
+    for (i in messages.indices) {
+        val m = messages[i]
+        val older = messages.getOrNull(i + 1)
+        val day = localTime(m.ts).date
+        val olderDay = older?.let { localTime(it.ts).date }
+        val firstOfRun = older == null || older.fromMe != m.fromMe || older.sender != m.sender || olderDay != day
+        rows.add(Row.Msg(m, firstOfRun, day))
+        if (olderDay != day) rows.add(Row.Day(day, m.id))
+    }
+    return rows
+}
+
+/** Pinned at the top of the chat: the date you are looking at, and how old it is. */
+@Composable
+private fun StickyDate(d: kotlinx.datetime.LocalDate, modifier: Modifier) {
+    val c = Wa.colors
+    val ago = daysAgo(d)
+    Text(
+        if (ago == "today") dayLabel(d) else "${dayLabel(d)} · $ago",
+        color = c.dateChipText, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+        modifier = modifier.shadow(2.dp, RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))
+            .background(c.dateChip).padding(horizontal = 12.dp, vertical = 6.dp).testTag("sticky-date"),
+    )
 }
 
 @Composable

@@ -35,14 +35,28 @@ fun listStamp(ts: String): String {
     }
 }
 
-/** Date chip inside a conversation. */
+/**
+ * Date chip inside a conversation. Always carries the calendar date — a bare
+ * "Wednesday" leaves you counting back days — and the year only when it isn't this one.
+ */
 fun dayLabel(d: LocalDate): String {
     val now = today()
+    val date = "${d.dayOfMonth} ${months[d.monthNumber - 1]}" + if (d.year != now.year) " ${d.year}" else ""
     return when {
-        d == now -> "Today"
-        d == now.minus(1, DateTimeUnit.DAY) -> "Yesterday"
-        d > now.minus(7, DateTimeUnit.DAY) -> weekdays[d.dayOfWeek.ordinal]
-        else -> "${d.dayOfMonth} ${months[d.monthNumber - 1]} ${d.year}"
+        d == now -> "Today · $date"
+        d == now.minus(1, DateTimeUnit.DAY) -> "Yesterday · $date"
+        else -> "${weekdays[d.dayOfWeek.ordinal]}, $date"
+    }
+}
+
+/** How long ago, in whole days — what matters for a job post. */
+fun daysAgo(d: LocalDate): String {
+    val n = today().toEpochDays() - d.toEpochDays()
+    return when {
+        n <= 0 -> "today"
+        n == 1 -> "1 day ago"
+        n < 60 -> "$n days ago"
+        else -> "${n / 30} months ago"
     }
 }
 
