@@ -44,6 +44,17 @@
                 android:value="Watches the user's own WhatsApp groups for new job posts and notifies within a minute" />
         </service>
 
+        <service
+            android:name=".FindMessageService"
+            android:exported="false"
+            android:label="@string/find_message_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/find_message_service" />
+        </service>
+
         <receiver android:name=".BootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

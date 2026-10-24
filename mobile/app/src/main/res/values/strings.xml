@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MyWhatsApp</string>
+    <string name="find_message_label">MyWhatsApp — find message</string>
+    <string name="find_message_description">When you tap "Show in WhatsApp" on a post, opens that chat\'s search in WhatsApp and enters the post so WhatsApp jumps to it. It acts only right after that tap, only inside WhatsApp, and never sends anything.</string>
 </resources>

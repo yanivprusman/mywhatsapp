@@ -14,6 +14,13 @@ expect fun openWhatsApp(phone: String): String?
 /** Open a WhatsApp chat (a group's or a person's [jid]) in the WhatsApp app. Returns an error, or null. */
 expect fun openWhatsAppChat(jid: String): String?
 
+/**
+ * Open [jid] in WhatsApp and land on the message whose text starts with [text]: the
+ * accessibility helper opens WhatsApp's in-chat search and enters it. Returns a note
+ * for the user (e.g. the helper is off and only the chat was opened), or null.
+ */
+expect fun showInWhatsApp(jid: String, text: String): String?
+
 /** Open the dialer on [phone]. Returns an error, or null. */
 expect fun dial(phone: String): String?
 

@@ -63,6 +63,43 @@ actual fun openWhatsAppChat(jid: String): String? {
         ?.let { "WhatsApp wouldn't open the chat: ${it.message}" }
 }
 
+/** What the accessibility helper should find once WhatsApp shows the chat. */
+data class FindJob(val jid: String, val query: String, val at: Long)
+
+object FindMessage {
+    @Volatile var job: FindJob? = null
+    const val SERVICE = "com.automatelinux.mywhatsapp.FindMessageService"
+
+    fun helperEnabled(): Boolean {
+        val ctx = AndroidPlatform.context
+        val on = android.provider.Settings.Secure.getString(ctx.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+        return on.split(':').any { it.equals("${ctx.packageName}/$SERVICE", ignoreCase = true) }
+    }
+
+    /** WhatsApp's search matches text inside messages; the first line, cut at a word, is distinctive and short. */
+    fun queryFor(text: String): String {
+        val line = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: return ""
+        if (line.length <= 40) return line
+        val cut = line.take(40)
+        return cut.substring(0, cut.lastIndexOf(' ').takeIf { it > 15 } ?: cut.length).trim()
+    }
+}
+
+actual fun showInWhatsApp(jid: String, text: String): String? {
+    val query = FindMessage.queryFor(text)
+    if (query.isEmpty() || !FindMessage.helperEnabled()) {
+        // Explicit state, not a silent fallback: without the helper only the chat can be opened.
+        if (query.isNotEmpty()) {
+            val cm = AndroidPlatform.context.getSystemService(android.content.ClipboardManager::class.java)
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("message", query))
+        }
+        return openWhatsAppChat(jid) ?: if (query.isEmpty()) null
+        else "Opened the chat. To land on the message, turn on MyWhatsApp in Accessibility (text copied for now)"
+    }
+    FindMessage.job = FindJob(jid, query, System.currentTimeMillis())
+    return openWhatsAppChat(jid)
+}
+
 actual fun dial(phone: String): String? {
     AndroidPlatform.context.startActivity(
         Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$phone")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
