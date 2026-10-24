@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
@@ -38,6 +39,22 @@ import com.automatelinux.mywhatsapp.data.Message
 import com.automatelinux.mywhatsapp.data.listStamp
 import com.automatelinux.mywhatsapp.data.mediaLabel
 import com.automatelinux.mywhatsapp.ui.theme.Wa
+
+/** A merged chat's avatar: the merge mark on the brand colour, so it never passes for a real group. */
+@Composable
+fun MergedAvatar(size: Dp = 52.dp) {
+    val c = Wa.colors
+    Box(Modifier.size(size).clip(CircleShape).background(c.emptyBadge), contentAlignment = Alignment.Center) {
+        Icon(Icons.Filled.MergeType, null, tint = c.brand, modifier = Modifier.size(size * 0.56f))
+    }
+}
+
+@Composable
+fun ChatAvatar(chat: Chat, size: Dp = 52.dp) = when {
+    chat.merged -> MergedAvatar(size)
+    chat.isGroup -> GroupAvatar(size)
+    else -> DefaultAvatar(size)
+}
 
 @Composable
 fun GroupAvatar(size: Dp = 52.dp) {
@@ -89,7 +106,7 @@ fun ChatRow(chat: Chat, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (chat.isGroup) GroupAvatar() else DefaultAvatar()
+        ChatAvatar(chat)
         Column(Modifier.padding(start = 16.dp).weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

@@ -46,7 +46,8 @@ import com.automatelinux.mywhatsapp.ui.theme.Wa
 fun privateReply(chat: Chat, m: Message): String {
     val gist = m.text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(2).joinToString(" ")
     val quote = if (gist.length > 140) gist.take(140) + "…" else gist
-    return "היי, לגבי ההודעה שלך בקבוצה ${chat.name}:\n\"$quote\"\n\n"
+    // Name the real group it was posted in — a merged chat's name means nothing to the poster.
+    return "היי, לגבי ההודעה שלך בקבוצה ${m.chatName ?: chat.name}:\n\"$quote\"\n\n"
 }
 
 /**
@@ -72,8 +73,8 @@ fun SenderSheet(chat: Chat, m: Message, onDismiss: () -> Unit, onResult: (String
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         when {
-                            phone != null -> "+$phone · ${chat.name}"
-                            m.fromMe -> chat.name
+                            phone != null -> "+$phone · ${m.chatName ?: chat.name}"
+                            m.fromMe -> m.chatName ?: chat.name
                             else -> "The bridge didn't record who sent this"
                         },
                         color = c.textSecondary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,

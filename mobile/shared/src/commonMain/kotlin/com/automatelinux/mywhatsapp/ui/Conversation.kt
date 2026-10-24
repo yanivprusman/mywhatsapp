@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
@@ -175,7 +176,11 @@ fun ConversationScreen(chat: Chat, initialFilter: String, onBack: () -> Unit, op
     }
 
     Column(Modifier.fillMaxSize().background(c.chatBg).imePadding()) {
-        ConversationTopBar(chat, members(messages), onBack, open)
+        ConversationTopBar(
+            chat,
+            if (chat.merged) chat.sources.joinToString(" · ") { it.name } else members(messages),
+            onBack, open,
+        )
         FilterBar(filter, counts) { filter = it }
         Box(Modifier.weight(1f)) {
             when {
@@ -200,7 +205,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String, onBack: () -> Unit, op
                         val day = localTime(m.ts).date
                         val firstOfRun = older == null || older.fromMe != m.fromMe ||
                             older.sender != m.sender || localTime(older.ts).date != day
-                        item(key = m.id) { Bubble(chat, m, firstOfRun, showKind = filter == "all") { sheetFor = m } }
+                        item(key = "${m.chatJid}/${m.id}") { Bubble(chat, m, firstOfRun, showKind = filter == "all") { sheetFor = m } }
                         if (older == null || localTime(older.ts).date != day) {
                             item(key = "day-$day-${m.id}") { DateChip(dayLabel(day)) }
                         }
@@ -222,10 +227,10 @@ fun ConversationScreen(chat: Chat, initialFilter: String, onBack: () -> Unit, op
                 )
             }
         }
-        InputBar(
+        if (chat.canSend) InputBar(
             draft, { draft = it }, onSend = ::send,
             onUnavailable = { what -> hint = "$what isn't available yet — text only for now" },
-        )
+        ) else ReadOnlyBar(chat)
     }
     sheetFor?.let { m -> SenderSheet(chat, m, onDismiss = { sheetFor = null }, onResult = { hint = it }) }
 }
@@ -244,7 +249,7 @@ private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit,
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = c.iconTint)
             Spacer(Modifier.width(2.dp))
-            GroupAvatar(40.dp)
+            ChatAvatar(chat, 40.dp)
         }
         Column(Modifier.weight(1f).padding(start = 10.dp)) {
             Text(chat.name, color = c.text, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -378,6 +383,7 @@ private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolea
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 2.dp))
             }
+            if (chat.merged) SourceLine(m)
             if (showKind && m.kind != null) KindTag(m.kind)
             when (m.mediaType) {
                 "image" -> ImageContent(chat, m)
@@ -418,6 +424,37 @@ private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolea
     }
 }
 
+/** Merged chats: which group a post is from, and how often this person posted it. */
+@Composable
+private fun SourceLine(m: Message) {
+    val c = Wa.colors
+    val group = m.chatName ?: return
+    val also = m.alsoIn.orEmpty()
+    val text = buildString {
+        append(group)
+        if (also.isNotEmpty()) append(" + ").append(also.joinToString(" + "))
+        m.repeats?.let { if (it > 1) append(" · posted ${it}×") }
+    }
+    Row(Modifier.padding(start = 6.dp, end = 6.dp, top = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.MergeType, null, tint = c.bubbleMeta, modifier = Modifier.size(13.dp))
+        Spacer(Modifier.width(3.dp))
+        Text(text, color = c.bubbleMeta, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Where the message box would be: a merged chat is read-only — replies go to the poster, privately. */
+@Composable
+private fun ReadOnlyBar(chat: Chat) {
+    val c = Wa.colors
+    Text(
+        if (chat.merged) "Merged from ${chat.sources.size} groups · tap a post to reply privately"
+        else "Read-only here · tap a post to reply privately",
+        color = c.textSecondary, fontSize = 14.sp, textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().background(c.background).navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    )
+}
+
 // WhatsApp's group-sender name colours; a sender keeps one colour everywhere.
 private val senderPalette = listOf(
     Color(0xFFE26AB6), Color(0xFF1F7AEC), Color(0xFFD9822B), Color(0xFF06A77D), Color(0xFF9B5DE5),
@@ -447,7 +484,7 @@ private fun ImageContent(chat: Chat, m: Message) {
     LaunchedEffect(m.id) {
         if (img != null || failed) return@LaunchedEffect
         try {
-            val decoded = decodeImage(api.media(chat.jid, m.id), 900)
+            val decoded = decodeImage(api.media(m.chatJid ?: chat.jid, m.id), 900)
             if (decoded != null) { cache[m.id] = decoded; img = decoded } else failed = true
         } catch (_: Exception) { failed = true }
     }

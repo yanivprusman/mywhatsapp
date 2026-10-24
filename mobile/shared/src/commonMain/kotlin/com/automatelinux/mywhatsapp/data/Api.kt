@@ -18,13 +18,28 @@ data class Message(
     val downloadable: Boolean,
     val senderName: String? = null,
     val kind: String? = null, // "wanted" | "available" | null — set by the server's classifier
+    val chatJid: String? = null,   // the real group it came from
+    val chatName: String? = null,  // merged chats: that group's name
+    val repeats: Int? = null,      // merged chats: times this person posted this text
+    val alsoIn: List<String>? = null,
     // Local-only: a message the phone sent that the bridge has not echoed back yet.
     val pending: Boolean = false,
     val failed: Boolean = false,
 )
 
 @Serializable
-data class Chat(val jid: String, val name: String, val isGroup: Boolean, val last: Message? = null, val unread: Int = 0)
+data class Chat(
+    val jid: String,
+    val name: String,
+    val isGroup: Boolean,
+    val last: Message? = null,
+    val unread: Int = 0,
+    val merged: Boolean = false,
+    val canSend: Boolean = false,
+    val sources: List<Source> = emptyList(),
+)
+
+@Serializable data class Source(val jid: String, val name: String)
 
 @Serializable data class WantedPost(val chatJid: String, val chatName: String, val message: Message)
 @Serializable data class WantedResponse(val posts: List<WantedPost>, val latest: String)
