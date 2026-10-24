@@ -31,6 +31,9 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.multiplatform.settings)
         }
+        androidMain.dependencies {
+            implementation(libs.activity.compose)
+        }
     }
 }
 
