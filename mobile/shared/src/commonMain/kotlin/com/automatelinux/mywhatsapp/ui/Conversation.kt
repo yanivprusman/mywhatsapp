@@ -257,21 +257,21 @@ private fun EncryptionNotice() {
     }
 }
 
-/** A rounded bubble whose first message in a run carries WhatsApp's little corner tail. */
+/**
+ * A rounded bubble whose first message in a run carries WhatsApp's little corner
+ * tail. The tail lives INSIDE the bounds (a [t]-wide strip on its side) so the
+ * clip does not cut it off; every bubble reserves the strip, tail or not.
+ */
 private fun bubbleShape(out: Boolean, tail: Boolean, r: Float, t: Float) = GenericShape { size: Size, _ ->
-    val w = size.width; val h = size.height
-    if (out) {
-        moveTo(r, 0f)
-        if (tail) { lineTo(w + t, 0f); lineTo(w, t * 1.2f) } else { lineTo(w - r, 0f); quadraticTo(w, 0f, w, r) }
-        lineTo(w, h - r); quadraticTo(w, h, w - r, h)
-        lineTo(r, h); quadraticTo(0f, h, 0f, h - r)
-        lineTo(0f, r); quadraticTo(0f, 0f, r, 0f)
-    } else {
-        moveTo(w - r, 0f); quadraticTo(w, 0f, w, r)
-        lineTo(w, h - r); quadraticTo(w, h, w - r, h)
-        lineTo(r, h); quadraticTo(0f, h, 0f, h - r)
-        if (tail) { lineTo(0f, t * 1.2f); lineTo(-t, 0f) } else { lineTo(0f, r); quadraticTo(0f, 0f, r, 0f) }
-    }
+    val h = size.height
+    val l = if (out) 0f else t            // body left edge
+    val w = if (out) size.width - t else size.width // body right edge
+    if (out && tail) { moveTo(l + r, 0f); lineTo(size.width, 0f); lineTo(w, t) }
+    else { moveTo(l + r, 0f); lineTo(w - r, 0f); quadraticTo(w, 0f, w, r) }
+    lineTo(w, h - r); quadraticTo(w, h, w - r, h)
+    lineTo(l + r, h); quadraticTo(l, h, l, h - r)
+    if (!out && tail) { lineTo(l, t); lineTo(0f, 0f) }
+    else { lineTo(l, r); quadraticTo(l, 0f, l + r, 0f) }
     close()
 }
 
@@ -295,16 +295,17 @@ private fun linkified(text: String): AnnotatedString {
 @Composable
 private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean) {
     val c = Wa.colors
-    val shape = bubbleShape(m.fromMe, firstOfRun, r = 22f, t = 22f)
+    val shape = bubbleShape(m.fromMe, firstOfRun, r = 22f, t = 24f)
     Row(
         Modifier.fillMaxWidth().padding(
-            start = if (m.fromMe) 56.dp else 14.dp, end = if (m.fromMe) 14.dp else 56.dp,
+            start = if (m.fromMe) 56.dp else 6.dp, end = if (m.fromMe) 6.dp else 56.dp,
             top = if (firstOfRun) 6.dp else 1.5.dp, bottom = 1.5.dp,
         ),
         horizontalArrangement = if (m.fromMe) Arrangement.End else Arrangement.Start,
     ) {
         Column(
-            Modifier.clip(shape).background(if (m.fromMe) c.bubbleOut else c.bubbleIn).padding(4.dp),
+            Modifier.clip(shape).background(if (m.fromMe) c.bubbleOut else c.bubbleIn)
+                .padding(start = if (m.fromMe) 4.dp else 13.dp, end = if (m.fromMe) 13.dp else 4.dp, top = 4.dp, bottom = 4.dp),
         ) {
             if (!m.fromMe && chat.isGroup && firstOfRun) {
                 Text("+" + m.sender, color = Color(0xFFE26AB6), fontSize = 13.sp, fontWeight = FontWeight.Medium,
