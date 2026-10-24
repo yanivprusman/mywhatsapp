@@ -10,8 +10,6 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import com.automatelinux.mywhatsapp.data.Api
 import com.automatelinux.mywhatsapp.data.WantedPost
-import com.automatelinux.mywhatsapp.ui.privateReply
-import com.automatelinux.mywhatsapp.data.Chat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -99,8 +97,7 @@ class WantedWatcherService : Service() {
             .setAutoCancel(true)
             .setGroup(GROUP_POSTS)
         if (Regex("^\\d{6,15}$").matches(m.sender)) {
-            val chat = Chat(p.chatJid, p.chatName, isGroup = true)
-            AndroidPlatform.whatsAppIntent(m.sender, privateReply(chat, m))?.let { wa ->
+            AndroidPlatform.whatsAppIntent(m.sender)?.let { wa ->
                 val pi = PendingIntent.getActivity(this, id + 1, wa, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
                 b.addAction(Notification.Action.Builder(null, "Message $sender", pi).build())
             }

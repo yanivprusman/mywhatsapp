@@ -20,11 +20,12 @@ object AndroidPlatform {
      */
     private val whatsAppPackages = listOf("com.whatsapp.w4b", "com.whatsapp")
 
-    fun whatsAppIntent(phone: String, text: String): Intent? {
+    /** The chat with [phone], empty — nothing typed in, exactly like WhatsApp's own "Message <name>". */
+    fun whatsAppIntent(phone: String): Intent? {
         val pkg = whatsAppPackages.firstOrNull { p ->
             runCatching { context.packageManager.getPackageInfo(p, 0) }.isSuccess
         } ?: return null
-        val uri = Uri.parse("https://api.whatsapp.com/send?phone=$phone&text=" + Uri.encode(text))
+        val uri = Uri.parse("https://api.whatsapp.com/send?phone=$phone")
         return Intent(Intent.ACTION_VIEW, uri).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }
@@ -35,8 +36,8 @@ private val settings by lazy {
 
 actual fun appSettings(): Settings = settings
 
-actual fun openWhatsApp(phone: String, text: String): String? {
-    val intent = AndroidPlatform.whatsAppIntent(phone, text) ?: return "WhatsApp isn't installed on this phone"
+actual fun openWhatsApp(phone: String): String? {
+    val intent = AndroidPlatform.whatsAppIntent(phone) ?: return "WhatsApp isn't installed on this phone"
     AndroidPlatform.context.startActivity(intent)
     return null
 }

@@ -42,17 +42,9 @@ import com.automatelinux.mywhatsapp.dial
 import com.automatelinux.mywhatsapp.openWhatsApp
 import com.automatelinux.mywhatsapp.ui.theme.Wa
 
-/** What to type when answering a post privately: which post, so the poster knows what you're replying to. */
-fun privateReply(chat: Chat, m: Message): String {
-    val gist = m.text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(2).joinToString(" ")
-    val quote = if (gist.length > 140) gist.take(140) + "…" else gist
-    // Name the real group it was posted in — a merged chat's name means nothing to the poster.
-    return "היי, לגבי ההודעה שלך בקבוצה ${m.chatName ?: chat.name}:\n\"$quote\"\n\n"
-}
-
 /**
- * Tapping a post: act on it. Messaging happens in the real WhatsApp, with the
- * post quoted, because that is where the conversation with the poster lives.
+ * Tapping a post: act on it. Messaging happens in the real WhatsApp, on an
+ * empty chat — the same as WhatsApp's own "Message <name>", no text added.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,8 +82,8 @@ fun SenderSheet(chat: Chat, m: Message, onDismiss: () -> Unit, onResult: (String
                 )
             } else Spacer(Modifier.height(12.dp))
             if (phone != null) {
-                SheetAction(Icons.AutoMirrored.Filled.Chat, "Message ${name.removePrefix("~ ")}", "Opens WhatsApp with this post quoted", "sheet-message", c.brand) {
-                    val err = openWhatsApp(phone, privateReply(chat, m))
+                SheetAction(Icons.AutoMirrored.Filled.Chat, "Message ${name.removePrefix("~ ")}", "Opens your chat with them in WhatsApp", "sheet-message", c.brand) {
+                    val err = openWhatsApp(phone)
                     if (err != null) onResult(err)
                     onDismiss()
                 }

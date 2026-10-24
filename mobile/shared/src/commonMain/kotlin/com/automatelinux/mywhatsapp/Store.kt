@@ -8,8 +8,8 @@ import kotlinx.serialization.json.Json
 /** The platform's key-value store (SharedPreferences on Android). */
 expect fun appSettings(): Settings
 
-/** Open WhatsApp on a chat with [phone] (digits, country code first), [text] typed in. Returns an error, or null. */
-expect fun openWhatsApp(phone: String, text: String): String?
+/** Open WhatsApp on the chat with [phone] (digits, country code first), as its own "Message" does. Returns an error, or null. */
+expect fun openWhatsApp(phone: String): String?
 
 /** Open the dialer on [phone]. Returns an error, or null. */
 expect fun dial(phone: String): String?
