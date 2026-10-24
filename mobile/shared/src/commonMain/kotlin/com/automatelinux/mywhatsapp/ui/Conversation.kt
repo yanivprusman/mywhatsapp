@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
@@ -97,19 +100,27 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var hint by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf("all") }
+    var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var loaded by remember { mutableStateOf(false) }
     val list = rememberLazyListState()
 
     // Newest page, then poll for what arrives while the chat is open.
-    LaunchedEffect(chat.jid) {
+    LaunchedEffect(chat.jid, filter) {
+        loaded = false
+        messages.clear()
         try {
-            val page = api.messages(chat.jid)
-            messages.clear(); messages.addAll(page.messages); hasMore = page.hasMore; error = null
+            val page = api.messages(chat.jid, filter)
+            messages.addAll(page.messages); hasMore = page.hasMore; error = null
+            if (filter == "all") page.counts?.let { counts = it }
+            list.scrollToItem(0)
         } catch (e: Exception) { error = e.message }
+        loaded = true
         while (true) {
             delay(4000)
             try {
                 val newest = messages.firstOrNull { !it.pending && !it.failed }?.ts ?: continue
-                val fresh = api.messages(chat.jid, after = newest).messages
+                val fresh = api.messages(chat.jid, filter, after = newest).messages
                 if (fresh.isNotEmpty()) {
                     // The bridge's echo replaces our optimistic copy of the same text.
                     fresh.forEach { f -> messages.removeAll { it.pending && it.text == f.text } }
@@ -129,7 +140,7 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
         loadingOlder = true
         try {
             val oldest = messages.last { !it.pending && !it.failed }.ts
-            val page = api.messages(chat.jid, before = oldest)
+            val page = api.messages(chat.jid, filter, before = oldest)
             messages.addAll(page.messages.filter { p -> messages.none { it.id == p.id } }); hasMore = page.hasMore
         } catch (e: Exception) { hint = "Couldn't load older messages: ${e.message}" }
         loadingOlder = false
@@ -157,13 +168,18 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().background(c.chatBg).imePadding()) {
-        ConversationTopBar(chat, onBack, open)
+        ConversationTopBar(chat, members(messages), onBack, open)
+        FilterBar(filter, counts) { filter = it }
         Box(Modifier.weight(1f)) {
             when {
                 error != null && messages.isEmpty() -> EmptyState(
                     Icons.Filled.ErrorOutline, "Can't load messages", error ?: "", Modifier.align(Alignment.Center),
                 )
-                messages.isEmpty() -> CircularProgressIndicator(color = c.brand, modifier = Modifier.align(Alignment.Center))
+                !loaded -> CircularProgressIndicator(color = c.brand, modifier = Modifier.align(Alignment.Center))
+                messages.isEmpty() -> EmptyState(
+                    Icons.Outlined.FilterAlt, "Nothing matches",
+                    "No ${filterLabel(filter).lowercase()} messages in this chat.", Modifier.align(Alignment.Center),
+                )
                 else -> LazyColumn(
                     state = list, reverseLayout = true, modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
@@ -175,7 +191,7 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
                         val day = localTime(m.ts).date
                         val firstOfRun = older == null || older.fromMe != m.fromMe ||
                             older.sender != m.sender || localTime(older.ts).date != day
-                        item(key = m.id) { Bubble(chat, m, firstOfRun) }
+                        item(key = m.id) { Bubble(chat, m, firstOfRun, showKind = filter == "all") }
                         if (older == null || localTime(older.ts).date != day) {
                             item(key = "day-$day-${m.id}") { DateChip(dayLabel(day)) }
                         }
@@ -205,7 +221,7 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
 }
 
 @Composable
-private fun ConversationTopBar(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
+private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit, open: (Screen) -> Unit) {
     val c = Wa.colors
     Row(
         Modifier.fillMaxWidth().background(c.background).statusBarsPadding().height(64.dp).padding(end = 4.dp),
@@ -222,12 +238,47 @@ private fun ConversationTopBar(chat: Chat, onBack: () -> Unit, open: (Screen) ->
         }
         Column(Modifier.weight(1f).padding(start = 10.dp)) {
             Text(chat.name, color = c.text, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("You", color = c.textSecondary, fontSize = 13.sp, maxLines = 1)
+            Text(subtitle, color = c.textSecondary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         BarIcon(Icons.Outlined.Videocam, "Video call", "video-call") { open(Screen.Empty("Video call", "call")) }
         BarIcon(Icons.Filled.Call, "Voice call", "voice-call") { open(Screen.Empty("Voice call", "call")) }
         OverflowMenu(listOf("Group info", "Media, links and docs", "Search", "Mute notifications", "Wallpaper"), "overflow-chat") {
             open(Screen.Empty(it, slug(it)))
+        }
+    }
+}
+
+private val chatFilters = listOf("all", "wanted", "available", "media", "links")
+
+private fun filterLabel(f: String) = when (f) {
+    "wanted" -> "Wanted"
+    "available" -> "Available"
+    "media" -> "Media"
+    "links" -> "Links"
+    else -> "All"
+}
+
+/** Who has spoken in what's loaded — WhatsApp's "Avi, Barak, You" subtitle, from the messages themselves. */
+private fun members(messages: List<Message>): String {
+    val names = messages.mapNotNull { it.senderName }.filter { it != "You" && it != "Unknown" }
+        .map { it.removePrefix("~ ") }.distinct().take(6)
+    return if (names.isEmpty()) "You" else (names + "You").joinToString(", ")
+}
+
+@Composable
+private fun FilterBar(selected: String, counts: Map<String, Int>, onSelect: (String) -> Unit) {
+    val c = Wa.colors
+    LazyRow(
+        Modifier.fillMaxWidth().background(c.background).padding(bottom = 8.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(chatFilters) { f ->
+            val n = counts[f]
+            FilterChip(
+                if (n != null) "${filterLabel(f)} · $n" else filterLabel(f),
+                selected == f, "chat-filter-$f",
+            ) { onSelect(f) }
         }
     }
 }
@@ -293,7 +344,7 @@ private fun linkified(text: String): AnnotatedString {
 }
 
 @Composable
-private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean) {
+private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolean) {
     val c = Wa.colors
     val shape = bubbleShape(m.fromMe, firstOfRun, r = 22f, t = 24f)
     Row(
@@ -303,19 +354,31 @@ private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean) {
         ),
         horizontalArrangement = if (m.fromMe) Arrangement.End else Arrangement.Start,
     ) {
+        if (!m.fromMe && chat.isGroup) {
+            if (firstOfRun) DefaultAvatar(30.dp) else Spacer(Modifier.width(30.dp))
+        }
         Column(
             Modifier.clip(shape).background(if (m.fromMe) c.bubbleOut else c.bubbleIn)
                 .padding(start = if (m.fromMe) 4.dp else 13.dp, end = if (m.fromMe) 13.dp else 4.dp, top = 4.dp, bottom = 4.dp),
         ) {
             if (!m.fromMe && chat.isGroup && firstOfRun) {
-                Text("+" + m.sender, color = Color(0xFFE26AB6), fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(start = 6.dp, top = 2.dp))
+                Text(m.senderName ?: "+${m.sender}", color = senderColor(m.sender), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 2.dp))
             }
+            if (showKind && m.kind != null) KindTag(m.kind)
             when (m.mediaType) {
                 "image" -> ImageContent(chat, m)
                 "video" -> MediaTile(Icons.Filled.PlayArrow, "Video")
                 "audio" -> AudioContent()
                 "document" -> DocumentContent(m)
+            }
+            if (m.text.isBlank() && m.mediaType.isEmpty()) {
+                Text(
+                    "This message type isn't shown here yet", color = c.bubbleMeta, fontSize = 14.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 3.dp),
+                )
             }
             if (m.text.isNotBlank()) {
                 Text(
@@ -339,6 +402,25 @@ private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean) {
             }
         }
     }
+}
+
+// WhatsApp's group-sender name colours; a sender keeps one colour everywhere.
+private val senderPalette = listOf(
+    Color(0xFFE26AB6), Color(0xFF1F7AEC), Color(0xFFD9822B), Color(0xFF06A77D), Color(0xFF9B5DE5),
+    Color(0xFFE5484D), Color(0xFF0E9AA7), Color(0xFFB5832A), Color(0xFF6D7CFF), Color(0xFF2E9E44),
+)
+
+private fun senderColor(sender: String) = senderPalette[(sender.hashCode() and 0x7fffffff) % senderPalette.size]
+
+@Composable
+private fun KindTag(kind: String) {
+    val (label, color) = if (kind == "wanted") "Wanted" to Color(0xFF1DAA61) else "Available" to Color(0xFF1F7AEC)
+    Text(
+        label, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 6.dp, top = 3.dp)
+            .clip(RoundedCornerShape(4.dp)).background(color.copy(alpha = 0.14f))
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+    )
 }
 
 @Composable

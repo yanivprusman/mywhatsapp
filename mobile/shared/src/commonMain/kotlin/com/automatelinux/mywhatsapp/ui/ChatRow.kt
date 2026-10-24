@@ -74,7 +74,8 @@ fun MessagePreview(m: Message?) {
             Icon(it, null, tint = c.textSecondary, modifier = Modifier.size(17.dp))
             Spacer(Modifier.width(3.dp))
         }
-        val text = m.text.lineSequence().firstOrNull { it.isNotBlank() } ?: mediaLabel(m)
+        val body = m.text.lineSequence().firstOrNull { it.isNotBlank() } ?: mediaLabel(m)
+        val text = if (!m.fromMe && m.senderName != null) "${m.senderName}: $body" else body
         Text(text, color = c.textSecondary, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
