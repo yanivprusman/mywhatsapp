@@ -38,6 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.data.Message
+import com.automatelinux.mywhatsapp.data.clock
+import com.automatelinux.mywhatsapp.data.dayLabel
+import com.automatelinux.mywhatsapp.data.daysAgo
+import com.automatelinux.mywhatsapp.data.localTime
 import com.automatelinux.mywhatsapp.dial
 import com.automatelinux.mywhatsapp.openWhatsApp
 import com.automatelinux.mywhatsapp.ui.theme.Wa
@@ -73,6 +77,13 @@ fun SenderSheet(chat: Chat, m: Message, onDismiss: () -> Unit, onResult: (String
                     )
                 }
             }
+            // When it was posted — the full date, and how long ago (a job post's age is what decides it).
+            val day = localTime(m.ts).date
+            Text(
+                "${dayLabel(day)} · ${clock(m.ts)}" + daysAgo(day).let { if (it == "today") "" else " · $it" },
+                color = c.textSecondary, fontSize = 14.sp,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp).testTag("sheet-date"),
+            )
             if (m.text.isNotBlank()) {
                 Text(
                     m.text, color = c.text, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 4, overflow = TextOverflow.Ellipsis,

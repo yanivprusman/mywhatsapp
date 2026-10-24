@@ -83,7 +83,6 @@ import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.data.Message
 import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
-import com.automatelinux.mywhatsapp.data.shortDay
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
 import com.automatelinux.mywhatsapp.ChatFilter
@@ -108,6 +107,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
     var filter by remember { mutableStateOf(initialFilter ?: ChatFilter.get(chat.jid)) }
     LaunchedEffect(filter) { ChatFilter.set(chat.jid, filter) }
     var sheetFor by remember { mutableStateOf<Message?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var loaded by remember { mutableStateOf(false) }
     // A fresh list per filter: each filter opens at its newest message.
@@ -179,18 +179,14 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
     }
 
     Column(Modifier.fillMaxSize().background(c.chatBg).imePadding()) {
+        val who = if (chat.merged) chat.sources.joinToString(" · ") { it.name } else members(messages)
+        // The filter is chosen in Group settings, not on screen — the subtitle is where it shows it's on.
         ConversationTopBar(
             chat,
-            if (chat.merged) chat.sources.joinToString(" · ") { it.name } else members(messages),
-            onBack, open,
+            if (filter == "all") who else "${filterLabel(filter)} only · $who",
+            onBack, open, onSettings = { showSettings = true },
         )
         val rows = remember(messages.toList()) { buildRows(messages) }
-        // The date of the post at the top of the screen, shown in the filter row (it covers nothing there).
-        val topDate by remember(rows) { derivedStateOf {
-            val top = list.layoutInfo.visibleItemsInfo.maxByOrNull { it.index }?.index
-            top?.let { rows.getOrNull(it)?.date }
-        } }
-        FilterBar(filter, counts, topDate.takeIf { loaded && rows.isNotEmpty() }) { filter = it }
         Box(Modifier.weight(1f)) {
             when {
                 error != null && messages.isEmpty() -> EmptyState(
@@ -238,10 +234,14 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
         ) else Spacer(Modifier.navigationBarsPadding()) // read-only: the chat runs to the bottom edge
     }
     sheetFor?.let { m -> SenderSheet(chat, m, onDismiss = { sheetFor = null }, onResult = { hint = it }) }
+    if (showSettings) {
+        com.automatelinux.mywhatsapp.PlatformBackHandler(true) { showSettings = false }
+        GroupSettings(chat, filter, counts, onFilter = { filter = it; showSettings = false }, onBack = { showSettings = false })
+    }
 }
 
 @Composable
-private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit, open: (Screen) -> Unit) {
+private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit, open: (Screen) -> Unit, onSettings: () -> Unit) {
     val c = Wa.colors
     Row(
         Modifier.fillMaxWidth().background(c.background).statusBarsPadding().height(64.dp).padding(end = 4.dp),
@@ -265,15 +265,15 @@ private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit,
             BarIcon(Icons.Outlined.Videocam, "Video call", "video-call") { open(Screen.Empty("Video call", "call")) }
             BarIcon(Icons.Filled.Call, "Voice call", "voice-call") { open(Screen.Empty("Voice call", "call")) }
         }
-        OverflowMenu(listOf("Group info", "Media, links and docs", "Search", "Mute notifications", "Wallpaper"), "overflow-chat") {
-            open(Screen.Empty(it, slug(it)))
+        OverflowMenu(listOf("Group settings", "Media, links and docs", "Search", "Mute notifications", "Wallpaper"), "overflow-chat") {
+            if (it == "Group settings") onSettings() else open(Screen.Empty(it, slug(it)))
         }
     }
 }
 
-private val chatFilters = listOf("all", "wanted", "available", "media", "links")
+internal val messageFilters = listOf("all", "wanted", "available", "media", "links")
 
-private fun filterLabel(f: String) = when (f) {
+internal fun filterLabel(f: String) = when (f) {
     "wanted" -> "Wanted"
     "available" -> "Available"
     "media" -> "Media"
@@ -286,36 +286,6 @@ private fun members(messages: List<Message>): String {
     val names = messages.mapNotNull { it.senderName }.filter { it != "You" && it != "Unknown" }
         .map { it.removePrefix("~ ") }.distinct().take(6)
     return if (names.isEmpty()) "You" else (names + "You").joinToString(", ")
-}
-
-@Composable
-private fun FilterBar(selected: String, counts: Map<String, Int>, date: kotlinx.datetime.LocalDate?, onSelect: (String) -> Unit) {
-    val c = Wa.colors
-    Row(
-        Modifier.fillMaxWidth().background(c.background).padding(bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LazyRow(
-            Modifier.weight(1f),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(chatFilters) { f ->
-                val n = counts[f]
-                FilterChip(
-                    if (n != null) "${filterLabel(f)} · $n" else filterLabel(f),
-                    selected == f, "chat-filter-$f",
-                ) { onSelect(f) }
-            }
-        }
-        // The day of the post at the top of the screen — pinned here instead of over the posts.
-        if (date != null) {
-            Text(
-                shortDay(date), color = c.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                maxLines = 1, modifier = Modifier.padding(end = 12.dp).testTag("top-date"),
-            )
-        }
-    }
 }
 
 /** One line of the conversation list, newest first (the list is reverse-laid). */
