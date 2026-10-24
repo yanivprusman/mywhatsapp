@@ -1,7 +1,7 @@
 import { authorize } from "@/lib/auth";
 import { query } from "@/lib/bridge";
 import { CHATS } from "@/lib/chats";
-import { MESSAGE_COLUMNS, toMessage } from "@/lib/messages";
+import { MESSAGE_COLUMNS, toMessage, withSenderNames } from "@/lib/messages";
 
 export async function GET(req: Request) {
   const denied = authorize(req);
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
           jid,
           name: String(info?.[1] ?? jid),
           isGroup: jid.endsWith("@g.us"),
-          last: last ? toMessage(last) : null,
+          last: last ? (await withSenderNames([toMessage(last)]))[0] : null,
         };
       }),
     );

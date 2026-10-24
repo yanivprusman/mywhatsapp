@@ -12,12 +12,12 @@ function config() {
   return { url, headers: { Authorization: `Bearer ${token}` } };
 }
 
-export async function query(sql: string, params: unknown[] = []): Promise<unknown[][]> {
+export async function query(sql: string, params: unknown[] = [], database: "messages" | "whatsmeow" = "messages"): Promise<unknown[][]> {
   const { url, headers } = config();
   const res = await fetch(`${url}/dbquery`, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ database: "messages", sql, params }),
+    body: JSON.stringify({ database, sql, params }),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`bridge dbquery: HTTP ${res.status} ${await res.text()}`);

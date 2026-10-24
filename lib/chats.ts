@@ -7,6 +7,7 @@ import "server-only";
  */
 export const CHATS: { jid: string }[] = [
   { jid: "120363427371815253@g.us" }, // קבוצה ריקה — the owner's own preview group
+  { jid: "972509974742-1431932281@g.us" }, // סנפלינג — rope-access jobs board (wanted / available posts)
 ];
 
 export function allowed(jid: string): boolean {
