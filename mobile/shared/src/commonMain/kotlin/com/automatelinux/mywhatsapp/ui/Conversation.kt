@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.automatelinux.mywhatsapp.data.Chat
@@ -114,17 +115,20 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
     var showSettings by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var loaded by remember { mutableStateOf(false) }
+    // Cleared up to here (server-kept); older messages are hidden, not deleted. Bump [reload] to refetch.
+    var clearedAt by remember { mutableStateOf(chat.clearedAt) }
+    var reload by remember { mutableStateOf(0) }
     // A fresh list per filter: each filter opens at its newest message.
     val list = remember(chat.jid, filter) { LazyListState() }
 
     // Newest page, then poll for what arrives while the chat is open.
-    LaunchedEffect(chat.jid, filter) {
+    LaunchedEffect(chat.jid, filter, reload) {
         loaded = false
         messages.clear()
         try {
             val page = api.messages(chat.jid, filter)
-            messages.addAll(page.messages); hasMore = page.hasMore; error = null
-            if (filter == "all") page.counts?.let { counts = it }
+            messages.addAll(page.messages); hasMore = page.hasMore; error = null; clearedAt = page.clearedAt
+            if (filter == "all" || reload > 0) page.counts?.let { counts = it }
             // Counts come with every first page; keep the All-view ones when opening filtered.
             if (counts.isEmpty()) page.counts?.let { counts = it }
             if (filter == "all") page.messages.firstOrNull()?.let { Seen.mark(chat.jid, it.ts) }
@@ -182,6 +186,23 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
         }
     }
 
+    // Clear up to the newest message on screen, so one that arrives meanwhile stays. Under a filter the
+    // screen doesn't show everything, so it clears up to the newest stored message instead.
+    fun clearChat() {
+        val upTo = if (filter == "all") messages.firstOrNull { !it.pending && !it.failed }?.ts else null
+        scope.launch {
+            try { api.clear(chat.jid, upTo); reload++; hint = "Chat cleared · ⋮ → Show history brings it back" }
+            catch (e: Exception) { hint = "Couldn't clear: ${e.message}" }
+        }
+    }
+
+    fun showHistory() {
+        scope.launch {
+            try { api.restoreHistory(chat.jid); reload++; hint = "History restored" }
+            catch (e: Exception) { hint = "Couldn't restore history: ${e.message}" }
+        }
+    }
+
     // Settings replace the chat on screen; the chat's state (messages, scroll) is remembered above and survives.
     if (showSettings) {
         com.automatelinux.mywhatsapp.PlatformBackHandler(true) { showSettings = false }
@@ -195,6 +216,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
             chat,
             if (filter == "all") who else "${filterLabel(filter)} only · $who",
             onBack, open, onSettings = { showSettings = true },
+            cleared = clearedAt != null, onClear = ::clearChat, onShowHistory = ::showHistory,
         )
         val rows = remember(messages.toList()) { buildRows(messages) }
         // WhatsApp's floating date: the day of the post at the top, shown while you scroll, gone a moment after.
@@ -213,6 +235,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                 !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = c.brand)
                 }
+                messages.isEmpty() && clearedAt != null -> ClearedEmpty(clearedAt!!, ::showHistory, Modifier.align(Alignment.Center))
                 messages.isEmpty() -> EmptyState(
                     Icons.Outlined.FilterAlt, "Nothing matches",
                     "No ${filterLabel(filter).lowercase()} messages in this chat.", Modifier.align(Alignment.Center),
@@ -234,7 +257,9 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                             CircularProgressIndicator(color = c.brand, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
                         }
                     }
-                    if (!hasMore) item(key = "notice") { EncryptionNotice() }
+                    if (!hasMore) item(key = "notice") {
+                        clearedAt?.let { ClearedNotice(it, ::showHistory) } ?: EncryptionNotice()
+                    }
                 }
             }
             // Fully qualified: inside a Column, a bare call resolves to the ColumnScope overload.
@@ -270,7 +295,10 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
 }
 
 @Composable
-private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit, open: (Screen) -> Unit, onSettings: () -> Unit) {
+private fun ConversationTopBar(
+    chat: Chat, subtitle: String, onBack: () -> Unit, open: (Screen) -> Unit, onSettings: () -> Unit,
+    cleared: Boolean, onClear: () -> Unit, onShowHistory: () -> Unit,
+) {
     val c = Wa.colors
     Row(
         Modifier.fillMaxWidth().background(c.background).statusBarsPadding().height(64.dp).padding(end = 4.dp),
@@ -294,8 +322,15 @@ private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit,
             BarIcon(Icons.Outlined.Videocam, "Video call", "video-call") { open(Screen.Empty("Video call", "call")) }
             BarIcon(Icons.Filled.Call, "Voice call", "voice-call") { open(Screen.Empty("Voice call", "call")) }
         }
-        OverflowMenu(listOf("Group settings", "Media, links and docs", "Search", "Mute notifications", "Wallpaper"), "overflow-chat") {
-            if (it == "Group settings") onSettings() else open(Screen.Empty(it, slug(it)))
+        val items = listOf("Group settings", "Media, links and docs", "Search", "Mute notifications", "Wallpaper", "Clear chat") +
+            (if (cleared) listOf("Show history") else emptyList())
+        OverflowMenu(items, "overflow-chat") {
+            when (it) {
+                "Group settings" -> onSettings()
+                "Clear chat" -> onClear()
+                "Show history" -> onShowHistory()
+                else -> open(Screen.Empty(it, slug(it)))
+            }
         }
     }
 }
@@ -350,6 +385,39 @@ private fun DateChip(label: String) {
         Text(
             label, color = c.dateChipText, fontSize = 12.5.sp, fontWeight = FontWeight.Medium,
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(c.dateChip).padding(horizontal = 10.dp, vertical = 5.dp),
+        )
+    }
+}
+
+/** At the top of a cleared chat, where the history would begin: says it was cleared, and brings it back. */
+@Composable
+private fun ClearedNotice(clearedAt: String, onShowHistory: () -> Unit) {
+    val c = Wa.colors
+    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+        Text(
+            buildAnnotatedString {
+                append("You cleared this chat up to ${dayLabel(localTime(clearedAt).date)}, ${clock(clearedAt)}. ")
+                withStyle(SpanStyle(color = c.brand, fontWeight = FontWeight.Medium)) { append("Show history") }
+            },
+            color = c.noticeText, fontSize = 12.5.sp, textAlign = TextAlign.Center, lineHeight = 17.sp,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(c.notice).clickable(onClick = onShowHistory)
+                .testTag("show-history").padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun ClearedEmpty(clearedAt: String, onShowHistory: () -> Unit, modifier: Modifier) {
+    val c = Wa.colors
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        EmptyState(
+            Icons.Filled.DoneAll, "All caught up",
+            "You cleared this chat up to ${dayLabel(localTime(clearedAt).date)}, ${clock(clearedAt)}. New messages will appear here.",
+        )
+        Text(
+            "Show history", color = c.brand, fontSize = 16.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onShowHistory)
+                .testTag("show-history-empty").padding(horizontal = 20.dp, vertical = 10.dp),
         )
     }
 }

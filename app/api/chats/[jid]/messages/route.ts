@@ -1,5 +1,6 @@
 import { authorize } from "@/lib/auth";
 import { findChat } from "@/lib/chats";
+import { clearedAt, laterOf } from "@/lib/cleared";
 import { FILTERS, type Filter, isAvailable, isWanted, matches } from "@/lib/filters";
 import { loadMessages } from "@/lib/merged";
 import { withSenderNames } from "@/lib/messages";
@@ -10,6 +11,8 @@ import { withSenderNames } from "@/lib/messages";
  * `filter=wanted|available|media|links` narrows to one kind of post; filtering
  * (and, for merged chats, collapsing reposts) runs over the whole chat, so a page
  * is always `limit` matches deep. The first page also carries `counts` per filter.
+ * A cleared chat starts after its cutoff; `clearedAt` says so, so the phone can
+ * offer the history back.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ jid: string }> }) {
   const denied = authorize(req);
@@ -27,7 +30,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ jid: str
 
   try {
     // Reposts can only be collapsed against the whole history, so pages load it all and cut by time.
-    const all = await loadMessages(def, after ? { after } : {});
+    const cutoff = clearedAt(def.id);
+    const from = laterOf(after, cutoff);
+    const all = await loadMessages(def, from ? { after: from } : {});
     const inRange = before ? all.filter((m) => m.ts < before) : all;
     const hits = inRange.filter((m) => matches(filter, m));
     const messages = (await withSenderNames(hits.slice(0, limit))).map((m) => ({
@@ -37,7 +42,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ jid: str
     const counts = !before && !after
       ? Object.fromEntries(FILTERS.map((f) => [f, all.filter((m) => matches(f, m)).length]))
       : undefined;
-    return Response.json({ messages, hasMore: !after && hits.length > limit, counts });
+    return Response.json({ messages, hasMore: !after && hits.length > limit, counts, clearedAt: cutoff });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 502 });
   }

@@ -37,6 +37,7 @@ data class Chat(
     val merged: Boolean = false,
     val canSend: Boolean = false,
     val sources: List<Source> = emptyList(),
+    val clearedAt: String? = null, // the chat was cleared up to here; older messages are hidden, not deleted
 )
 
 @Serializable data class Source(val jid: String, val name: String)
@@ -49,8 +50,10 @@ data class Chat(
     val messages: List<Message>,
     val hasMore: Boolean,
     val counts: Map<String, Int>? = null, // first page only: matches per filter over the whole chat
+    val clearedAt: String? = null,        // set when the chat was cleared: the page starts after it
 )
 @Serializable private data class SendBody(val text: String)
+@Serializable private data class ClearBody(val upTo: String?)
 
 /** The app's backend (Next.js on the dev host), which reads the leader's WhatsApp bridge. */
 class Api(private val baseUrl: String, private val token: String) {
@@ -89,6 +92,16 @@ class Api(private val baseUrl: String, private val token: String) {
 
     suspend fun send(jid: String, text: String) {
         httpRequest("POST", url("/api/chats/${enc(jid)}/send"), token, json.encodeToString(SendBody(text)))
+    }
+
+    /** Hide everything up to [upTo] (null = the newest stored message). Nothing is deleted in WhatsApp. */
+    suspend fun clear(jid: String, upTo: String?) {
+        httpRequest("POST", url("/api/chats/${enc(jid)}/clear"), token, json.encodeToString(ClearBody(upTo)))
+    }
+
+    /** Undo [clear]: the whole history shows again. */
+    suspend fun restoreHistory(jid: String) {
+        httpRequest("DELETE", url("/api/chats/${enc(jid)}/clear"), token, null)
     }
 
     suspend fun media(jid: String, id: String): ByteArray =
