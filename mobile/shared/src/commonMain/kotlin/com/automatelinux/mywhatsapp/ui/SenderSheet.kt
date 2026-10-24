@@ -44,6 +44,8 @@ import com.automatelinux.mywhatsapp.data.daysAgo
 import com.automatelinux.mywhatsapp.data.localTime
 import com.automatelinux.mywhatsapp.dial
 import com.automatelinux.mywhatsapp.openWhatsApp
+import com.automatelinux.mywhatsapp.openWhatsAppChat
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import com.automatelinux.mywhatsapp.ui.theme.Wa
 
 /**
@@ -92,6 +94,18 @@ fun SenderSheet(chat: Chat, m: Message, onDismiss: () -> Unit, onResult: (String
                         .clip(RoundedCornerShape(10.dp)).background(c.chatBg).padding(12.dp),
                 )
             } else Spacer(Modifier.height(12.dp))
+            // The post where it was written. WhatsApp can open the group but not scroll to a message,
+            // so the text goes on the clipboard: paste it into WhatsApp's chat search to land on it.
+            val group = m.chatJid ?: chat.jid
+            SheetAction(
+                Icons.AutoMirrored.Filled.OpenInNew, "Show in WhatsApp",
+                "Opens ${m.chatName ?: chat.name}" + if (m.text.isNotBlank()) " · text copied for its search" else "",
+                "sheet-show-in-whatsapp", c.brand,
+            ) {
+                if (m.text.isNotBlank()) clipboard.setText(AnnotatedString(m.text.lineSequence().first { it.isNotBlank() }.trim()))
+                openWhatsAppChat(group)?.let(onResult)
+                onDismiss()
+            }
             if (phone != null) {
                 SheetAction(Icons.AutoMirrored.Filled.Chat, "Message ${name.removePrefix("~ ")}", "Opens your chat with them in WhatsApp", "sheet-message", c.brand) {
                     val err = openWhatsApp(phone)

@@ -11,6 +11,9 @@ expect fun appSettings(): Settings
 /** Open WhatsApp on the chat with [phone] (digits, country code first), as its own "Message" does. Returns an error, or null. */
 expect fun openWhatsApp(phone: String): String?
 
+/** Open a WhatsApp chat (a group's or a person's [jid]) in the WhatsApp app. Returns an error, or null. */
+expect fun openWhatsAppChat(jid: String): String?
+
 /** Open the dialer on [phone]. Returns an error, or null. */
 expect fun dial(phone: String): String?
 
