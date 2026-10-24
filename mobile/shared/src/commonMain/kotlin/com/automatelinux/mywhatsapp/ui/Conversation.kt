@@ -73,6 +73,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
@@ -383,8 +384,10 @@ private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolea
                 )
             }
             if (m.text.isNotBlank()) {
+                // Hebrew posts read right-to-left: alignment follows the text, as in WhatsApp.
                 Text(
                     linkified(m.text), color = c.text, fontSize = 16.sp, lineHeight = 21.sp,
+                    style = TextStyle(textDirection = TextDirection.Content, textAlign = TextAlign.Start),
                     modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 3.dp),
                 )
             }
