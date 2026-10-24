@@ -84,7 +84,6 @@ import com.automatelinux.mywhatsapp.data.Message
 import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
 import com.automatelinux.mywhatsapp.data.shortDay
-import androidx.compose.ui.draw.shadow
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
 import com.automatelinux.mywhatsapp.ChatFilter
