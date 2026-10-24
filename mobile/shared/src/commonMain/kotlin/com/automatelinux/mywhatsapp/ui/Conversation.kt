@@ -255,8 +255,11 @@ private fun ConversationTopBar(chat: Chat, subtitle: String, onBack: () -> Unit,
             Text(chat.name, color = c.text, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = c.textSecondary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        BarIcon(Icons.Outlined.Videocam, "Video call", "video-call") { open(Screen.Empty("Video call", "call")) }
-        BarIcon(Icons.Filled.Call, "Voice call", "voice-call") { open(Screen.Empty("Voice call", "call")) }
+        // A merged chat is no one group: no calls to place, and its name needs the room.
+        if (!chat.merged) {
+            BarIcon(Icons.Outlined.Videocam, "Video call", "video-call") { open(Screen.Empty("Video call", "call")) }
+            BarIcon(Icons.Filled.Call, "Voice call", "voice-call") { open(Screen.Empty("Voice call", "call")) }
+        }
         OverflowMenu(listOf("Group info", "Media, links and docs", "Search", "Mute notifications", "Wallpaper"), "overflow-chat") {
             open(Screen.Empty(it, slug(it)))
         }
