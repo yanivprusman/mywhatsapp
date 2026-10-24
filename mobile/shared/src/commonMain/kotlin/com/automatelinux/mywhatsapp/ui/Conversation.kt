@@ -178,6 +178,12 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
         }
     }
 
+    // Settings replace the chat on screen; the chat's state (messages, scroll) is remembered above and survives.
+    if (showSettings) {
+        com.automatelinux.mywhatsapp.PlatformBackHandler(true) { showSettings = false }
+        GroupSettings(chat, filter, counts, onFilter = { filter = it; showSettings = false }, onBack = { showSettings = false })
+        return
+    }
     Column(Modifier.fillMaxSize().background(c.chatBg).imePadding()) {
         val who = if (chat.merged) chat.sources.joinToString(" · ") { it.name } else members(messages)
         // The filter is chosen in Group settings, not on screen — the subtitle is where it shows it's on.
@@ -234,10 +240,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
         ) else Spacer(Modifier.navigationBarsPadding()) // read-only: the chat runs to the bottom edge
     }
     sheetFor?.let { m -> SenderSheet(chat, m, onDismiss = { sheetFor = null }, onResult = { hint = it }) }
-    if (showSettings) {
-        com.automatelinux.mywhatsapp.PlatformBackHandler(true) { showSettings = false }
-        GroupSettings(chat, filter, counts, onFilter = { filter = it; showSettings = false }, onBack = { showSettings = false })
-    }
+
 }
 
 @Composable
