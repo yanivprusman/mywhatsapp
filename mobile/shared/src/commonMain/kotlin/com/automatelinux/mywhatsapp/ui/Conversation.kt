@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.outlined.FilterAlt
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -103,7 +103,8 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
     var filter by remember { mutableStateOf("all") }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var loaded by remember { mutableStateOf(false) }
-    val list = rememberLazyListState()
+    // A fresh list per filter: each filter opens at its newest message.
+    val list = remember(chat.jid, filter) { LazyListState() }
 
     // Newest page, then poll for what arrives while the chat is open.
     LaunchedEffect(chat.jid, filter) {
@@ -113,7 +114,6 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
             val page = api.messages(chat.jid, filter)
             messages.addAll(page.messages); hasMore = page.hasMore; error = null
             if (filter == "all") page.counts?.let { counts = it }
-            list.scrollToItem(0)
         } catch (e: Exception) { error = e.message }
         loaded = true
         while (true) {
@@ -175,7 +175,9 @@ fun ConversationScreen(chat: Chat, onBack: () -> Unit, open: (Screen) -> Unit) {
                 error != null && messages.isEmpty() -> EmptyState(
                     Icons.Filled.ErrorOutline, "Can't load messages", error ?: "", Modifier.align(Alignment.Center),
                 )
-                !loaded -> CircularProgressIndicator(color = c.brand, modifier = Modifier.align(Alignment.Center))
+                !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = c.brand)
+                }
                 messages.isEmpty() -> EmptyState(
                     Icons.Outlined.FilterAlt, "Nothing matches",
                     "No ${filterLabel(filter).lowercase()} messages in this chat.", Modifier.align(Alignment.Center),
