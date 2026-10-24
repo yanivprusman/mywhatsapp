@@ -239,7 +239,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
         if (chat.canSend) InputBar(
             draft, { draft = it }, onSend = ::send,
             onUnavailable = { what -> hint = "$what isn't available yet — text only for now" },
-        ) else ReadOnlyBar(chat)
+        ) else Spacer(Modifier.navigationBarsPadding()) // read-only: the chat runs to the bottom edge
     }
     sheetFor?.let { m -> SenderSheet(chat, m, onDismiss = { sheetFor = null }, onResult = { hint = it }) }
 }
@@ -491,19 +491,6 @@ private fun SourceLine(m: Message) {
         Spacer(Modifier.width(3.dp))
         Text(text, color = c.bubbleMeta, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-}
-
-/** Where the message box would be: a merged chat is read-only — replies go to the poster, privately. */
-@Composable
-private fun ReadOnlyBar(chat: Chat) {
-    val c = Wa.colors
-    Text(
-        if (chat.merged) "Merged from ${chat.sources.size} groups · tap a post to reply privately"
-        else "Read-only here · tap a post to reply privately",
-        color = c.textSecondary, fontSize = 14.sp, textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth().background(c.background).navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-    )
 }
 
 // WhatsApp's group-sender name colours; a sender keeps one colour everywhere.
