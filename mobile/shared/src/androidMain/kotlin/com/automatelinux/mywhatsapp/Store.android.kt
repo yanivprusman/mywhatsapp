@@ -32,7 +32,10 @@ object AndroidPlatform {
      */
     fun chatIntent(jid: String): Intent? {
         val pkg = installedWhatsApp() ?: return null
-        return Intent("$pkg.Conversation").setPackage(pkg).putExtra("jid", jid).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // CLEAR_TASK: an already-open WhatsApp conversation otherwise swallows the intent and stays
+        // on ITS chat (measured: asked for one group, got the one open from before).
+        return Intent("$pkg.Conversation").setPackage(pkg).putExtra("jid", jid)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }
 
     fun whatsAppIntent(phone: String): Intent? {
