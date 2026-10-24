@@ -85,6 +85,7 @@ import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
+import com.automatelinux.mywhatsapp.ChatFilter
 import com.automatelinux.mywhatsapp.Seen
 import com.automatelinux.mywhatsapp.decodeImage
 import com.automatelinux.mywhatsapp.ui.theme.Wa
@@ -93,7 +94,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
 @Composable
-fun ConversationScreen(chat: Chat, initialFilter: String, onBack: () -> Unit, open: (Screen) -> Unit) {
+fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, open: (Screen) -> Unit) {
     val c = Wa.colors
     val api = LocalApi.current
     val scope = rememberCoroutineScope()
@@ -103,7 +104,8 @@ fun ConversationScreen(chat: Chat, initialFilter: String, onBack: () -> Unit, op
     var error by remember { mutableStateOf<String?>(null) }
     var hint by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(initialFilter) }
+    var filter by remember { mutableStateOf(initialFilter ?: ChatFilter.get(chat.jid)) }
+    LaunchedEffect(filter) { ChatFilter.set(chat.jid, filter) }
     var sheetFor by remember { mutableStateOf<Message?>(null) }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var loaded by remember { mutableStateOf(false) }

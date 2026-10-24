@@ -27,6 +27,12 @@ object Seen {
     }
 }
 
+/** The filter chip last chosen in each chat — a chat reopens on it (after leaving it, or a restart). */
+object ChatFilter {
+    fun get(jid: String): String = appSettings().getString("filter:$jid", "all")
+    fun set(jid: String, filter: String) = appSettings().putString("filter:$jid", filter)
+}
+
 /** Notifications for new Wanted posts. On by default; the Android side starts/stops the watcher. */
 object Alerts {
     private const val KEY = "wantedAlerts"
