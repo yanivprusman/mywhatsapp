@@ -67,9 +67,16 @@ class FindMessageService : AccessibilityService() {
                 box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
                 main.postDelayed({
                     box.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
-                    FindMessage.job = null
-                    step = Step.DONE
-                    running = false
+                    // Once WhatsApp has scrolled to the match, empty the box: the chat stays on the message.
+                    main.postDelayed({
+                        box.refresh()
+                        box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+                            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+                        })
+                        FindMessage.job = null
+                        step = Step.DONE
+                        running = false
+                    }, CLEAR_AFTER_MS)
                 }, 300)
             }
             Step.DONE -> running = false
@@ -97,6 +104,7 @@ class FindMessageService : AccessibilityService() {
 
     companion object {
         private const val TIMEOUT_MS = 10_000L
+        private const val CLEAR_AFTER_MS = 1_200L
         private val SEARCH_LABELS = setOf("Search", "חיפוש")
     }
 }
