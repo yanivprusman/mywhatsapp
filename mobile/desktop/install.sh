@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the Linux desktop app and install it for this user: an app image (bundled JRE)
-# under ~/.local/share/mywhatsapp, a launcher in the GNOME app grid, and its icon.
+# under ~/.local/share/mywhatsapp, a launcher in the GNOME app grid, its icon, and a
+# `mywhatsapp` command in /usr/local/bin.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -24,6 +25,12 @@ Terminal=false
 Categories=Network;Chat;
 StartupWMClass=com-automatelinux-mywhatsapp-MainKt
 DESKTOP
+# `mywhatsapp` from a terminal: detached, so the window outlives the shell and the
+# terminal isn't filled with JVM output.
+install -Dm755 /dev/stdin /usr/local/bin/mywhatsapp <<CMD
+#!/usr/bin/env bash
+exec setsid -f "$dest/bin/MyWhatsApp" "\$@" >/dev/null 2>&1
+CMD
 update-desktop-database "$data/applications" 2>/dev/null || true
 gtk-update-icon-cache -q "$data/icons/hicolor" 2>/dev/null || true
-echo "Installed: $dest/bin/MyWhatsApp (launcher: MyWhatsApp)"
+echo "Installed: $dest/bin/MyWhatsApp (launcher: MyWhatsApp, command: mywhatsapp)"
