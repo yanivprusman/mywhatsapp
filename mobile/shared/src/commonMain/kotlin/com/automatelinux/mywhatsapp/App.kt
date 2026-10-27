@@ -119,7 +119,7 @@ fun App(config: AppConfig) {
         var chatsError by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(top == null) {
             while (top == null) {
-                try { chats = api.chats(Seen.all(), ChatFilter.all()); chatsError = null } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
+                try { chats = api.chats(); chatsError = null } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
                 delay(15_000)
             }
         }

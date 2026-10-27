@@ -90,8 +90,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.ui.draw.shadow
 import com.automatelinux.mywhatsapp.data.displayFilename
 import com.automatelinux.mywhatsapp.data.localTime
-import com.automatelinux.mywhatsapp.ChatFilter
-import com.automatelinux.mywhatsapp.Seen
 import com.automatelinux.mywhatsapp.decodeImage
 import com.automatelinux.mywhatsapp.ui.theme.Wa
 import kotlinx.coroutines.delay
@@ -109,8 +107,13 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
     var error by remember { mutableStateOf<String?>(null) }
     var hint by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(initialFilter ?: ChatFilter.get(chat.jid)) }
-    LaunchedEffect(filter) { ChatFilter.set(chat.jid, filter) }
+    // Server-kept, so the chat opens on the filter last chosen on any device.
+    var filter by remember { mutableStateOf(initialFilter ?: chat.filter) }
+    var savedFilter by remember { mutableStateOf(chat.filter) }
+    LaunchedEffect(filter) {
+        if (filter == savedFilter) return@LaunchedEffect
+        try { api.setFilter(chat.jid, filter); savedFilter = filter } catch (e: Exception) { hint = "Filter not saved: ${e.message}" }
+    }
     var sheetFor by remember { mutableStateOf<Message?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
@@ -118,6 +121,9 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
     // Cleared up to here (server-kept); older messages are hidden, not deleted. Bump [reload] to refetch.
     var clearedAt by remember { mutableStateOf(chat.clearedAt) }
     var reload by remember { mutableStateOf(0) }
+    val markSeen: suspend (String) -> Unit = { ts ->
+        try { api.markSeen(chat.jid, ts) } catch (_: Exception) { /* only a badge is left; the next page shown marks past it */ }
+    }
     // A fresh list per filter: each filter opens at its newest message.
     val list = remember(chat.jid, filter) { LazyListState() }
 
@@ -132,7 +138,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
             // Counts come with every first page; keep the All-view ones when opening filtered.
             if (counts.isEmpty()) page.counts?.let { counts = it }
             // Under a filter too: the list's unread count is of that filter's messages, so what's shown is what's seen.
-            page.messages.firstOrNull()?.let { Seen.mark(chat.jid, it.ts) }
+            page.messages.firstOrNull()?.let { markSeen(it.ts) }
         } catch (e: Exception) { error = e.message }
         loaded = true
         while (true) {
@@ -144,7 +150,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
                     // The bridge's echo replaces our optimistic copy of the same text.
                     fresh.forEach { f -> messages.removeAll { it.pending && it.text == f.text } }
                     messages.addAll(0, fresh.filter { f -> messages.none { it.id == f.id } })
-                    fresh.maxByOrNull { it.ts }?.let { Seen.mark(chat.jid, it.ts) }
+                    fresh.maxByOrNull { it.ts }?.let { markSeen(it.ts) }
                     if (list.firstVisibleItemIndex <= 2) list.animateScrollToItem(0)
                 }
             } catch (_: Exception) { /* next tick retries; the first-load error is the visible one */ }

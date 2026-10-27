@@ -27,28 +27,6 @@ expect val canDial: Boolean
 /** Open the dialer on [phone]. Returns an error, or null. */
 expect fun dial(phone: String): String?
 
-/** The newest message the user has seen, per chat — drives unread badges. */
-object Seen {
-    private const val KEY = "seen"
-    fun all(): Map<String, String> =
-        appSettings().getStringOrNull(KEY)?.let { Json.decodeFromString<Map<String, String>>(it) } ?: emptyMap()
-
-    fun mark(jid: String, ts: String) {
-        val cur = all()
-        if ((cur[jid] ?: "") >= ts) return
-        appSettings().putString(KEY, Json.encodeToString<Map<String, String>>(cur + (jid to ts)))
-    }
-}
-
-/** The filter chip last chosen in each chat — a chat reopens on it (after leaving it, or a restart). */
-object ChatFilter {
-    fun get(jid: String): String = appSettings().getString("filter:$jid", "all")
-    fun set(jid: String, filter: String) = appSettings().putString("filter:$jid", filter)
-    /** Every chat not on All — the chat list asks for their last line and unread count under it. */
-    fun all(): Map<String, String> = appSettings().keys.filter { it.startsWith("filter:") }
-        .associate { it.removePrefix("filter:") to get(it.removePrefix("filter:")) }.filterValues { it != "all" }
-}
-
 /** Notifications for new Wanted posts. On by default; the Android side starts/stops the watcher. */
 object Alerts {
     private const val KEY = "wantedAlerts"

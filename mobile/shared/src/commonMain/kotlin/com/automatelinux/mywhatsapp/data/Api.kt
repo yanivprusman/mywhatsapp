@@ -55,6 +55,7 @@ data class Chat(
 )
 @Serializable private data class SendBody(val text: String)
 @Serializable private data class ClearBody(val upTo: String?)
+@Serializable private data class StateBody(val filter: String? = null, val seen: String? = null)
 
 /** The app's backend (Next.js on the dev host), which reads the leader's WhatsApp bridge. */
 class Api(private val baseUrl: String, private val token: String) {
@@ -72,13 +73,18 @@ class Api(private val baseUrl: String, private val token: String) {
         require(token.isNotBlank()) { "API_TOKEN is missing — set it in mobile/.env and rebuild" }
     }
 
-    /**
-     * [seen]: newest message timestamp the phone has shown, per chat — the server counts unread after it.
-     * [filters]: the filter each chat is open on — its last line and unread count are of those messages only.
-     */
-    suspend fun chats(seen: Map<String, String>, filters: Map<String, String>): List<Chat> {
-        val q = "/api/chats?seen=" + enc(json.encodeToString(seen)) + "&filters=" + enc(json.encodeToString(filters))
-        return json.decodeFromString<ChatsResponse>(httpRequest("GET", url(q), token, null).decodeToString()).chats
+    /** Each chat with its filter and unread count — both kept on the server, so every device shows the same. */
+    suspend fun chats(): List<Chat> =
+        json.decodeFromString<ChatsResponse>(httpRequest("GET", url("/api/chats"), token, null).decodeToString()).chats
+
+    /** Open [jid] on [filter] from now on, on every device. */
+    suspend fun setFilter(jid: String, filter: String) {
+        httpRequest("PUT", url("/api/chats/${enc(jid)}/state"), token, json.encodeToString(StateBody(filter = filter)))
+    }
+
+    /** [ts] is the newest message shown in [jid] — unread counts after it, on every device. */
+    suspend fun markSeen(jid: String, ts: String) {
+        httpRequest("PUT", url("/api/chats/${enc(jid)}/state"), token, json.encodeToString(StateBody(seen = ts)))
     }
 
     /** New Wanted posts after [after]; with null, only `latest` (where a fresh watcher starts). */
