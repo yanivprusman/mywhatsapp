@@ -100,6 +100,8 @@ actual fun showInWhatsApp(jid: String, text: String): String? {
     return openWhatsAppChat(jid)
 }
 
+actual val canDial: Boolean = true
+
 actual fun dial(phone: String): String? {
     AndroidPlatform.context.startActivity(
         Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$phone")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

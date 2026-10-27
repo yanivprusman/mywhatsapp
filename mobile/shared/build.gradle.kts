@@ -9,8 +9,8 @@ plugins {
 }
 
 // Shared Kotlin Multiplatform module.
-// commonMain runs on BOTH Android and iOS; androidMain / iosMain hold the thin
-// platform-specific actuals. iosArm64()/iosSimulatorArm64() are added when building
+// commonMain runs on Android, iOS and the Linux desktop; androidMain / iosMain /
+// desktopMain hold the thin platform-specific actuals. iosArm64()/iosSimulatorArm64() are added when building
 // on a Mac. See /opt/automateLinux/.claude/docs/kmp-migration-playbook.md
 kotlin {
     androidTarget {
@@ -18,6 +18,8 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
+    // The Linux desktop app (:desktop) — the same screens in a Compose Desktop window.
+    jvm("desktop")
     // iosArm64(); iosSimulatorArm64()   // enable on a Mac
 
     sourceSets {
@@ -33,6 +35,11 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.activity.compose)
+        }
+        val desktopMain by getting {
+            dependencies {
+                implementation(compose.desktop.common)
+            }
         }
     }
 }

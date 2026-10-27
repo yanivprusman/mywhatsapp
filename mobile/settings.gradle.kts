@@ -24,3 +24,4 @@ includeBuild("build-logic")
 rootProject.name = "mywhatsapp"
 include(":shared")
 include(":app")
+include(":desktop")

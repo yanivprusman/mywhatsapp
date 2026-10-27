@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="18 18 72 72" width="256" height="256">
+  <!-- The phone's adaptive launcher icon (app/src/main/res/drawable/ic_launcher_*), its 72-unit safe zone, rounded. -->
+  <defs>
+    <linearGradient id="g" x1="18" y1="18" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3BE07A"/><stop offset="0.55" stop-color="#1DAA61"/><stop offset="1" stop-color="#0B7A4B"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="18" width="72" height="72" rx="16" fill="url(#g)"/>
+  <path transform="translate(0.8 1.6)" fill="#063D24" fill-opacity="0.2" d="M55,31 A21,21 0 1 1 44.5,70.2 L33,74 L37,63.2 A21,21 0 0 1 55,31 Z"/>
+  <path fill="#FFFFFF" d="M55,31 A21,21 0 1 1 44.5,70.2 L33,74 L37,63.2 A21,21 0 0 1 55,31 Z"/>
+  <path fill="none" stroke="#128C4E" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round" d="M46,60 V44.5 L55,54.5 L64,44.5 V60"/>
+</svg>

@@ -21,6 +21,9 @@ expect fun openWhatsAppChat(jid: String): String?
  */
 expect fun showInWhatsApp(jid: String, text: String): String?
 
+/** Whether this device can place a call (false on the desktop — the sheet then has no Call row). */
+expect val canDial: Boolean
+
 /** Open the dialer on [phone]. Returns an error, or null. */
 expect fun dial(phone: String): String?
 

@@ -42,6 +42,7 @@ import com.automatelinux.mywhatsapp.data.clock
 import com.automatelinux.mywhatsapp.data.dayLabel
 import com.automatelinux.mywhatsapp.data.daysAgo
 import com.automatelinux.mywhatsapp.data.localTime
+import com.automatelinux.mywhatsapp.canDial
 import com.automatelinux.mywhatsapp.dial
 import com.automatelinux.mywhatsapp.openWhatsApp
 import com.automatelinux.mywhatsapp.showInWhatsApp
@@ -110,7 +111,7 @@ fun SenderSheet(chat: Chat, m: Message, onDismiss: () -> Unit, onResult: (String
                     if (err != null) onResult(err)
                     onDismiss()
                 }
-                SheetAction(Icons.Filled.Call, "Call", "+$phone", "sheet-call") {
+                if (canDial) SheetAction(Icons.Filled.Call, "Call", "+$phone", "sheet-call") {
                     dial(phone)?.let(onResult); onDismiss()
                 }
                 SheetAction(Icons.Filled.Numbers, "Copy number", null, "sheet-copy-number") {
