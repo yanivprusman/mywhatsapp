@@ -13,8 +13,12 @@ rm -rf "$dest.new"
 cp -a "$here/build/compose/binaries/main/app/MyWhatsApp" "$dest.new"
 rm -rf "$dest"; mv "$dest.new" "$dest"
 
-install -Dm644 "$here/src/jvmMain/resources/mywhatsapp.svg" "$data/icons/hicolor/scalable/apps/mywhatsapp.svg"
-install -Dm644 /dev/stdin "$data/applications/mywhatsapp.desktop" <<DESKTOP
+# mkdir -p + plain install, never `install -D`: Ubuntu's uutils install -D replaces a
+# symlinked parent with a real, empty directory — ~/.local/share/applications is a
+# symlink into automateLinux, and -D wiped every other launcher in the dock.
+mkdir -p "$data/icons/hicolor/scalable/apps" "$data/applications" /usr/local/bin
+install -m644 "$here/src/jvmMain/resources/mywhatsapp.svg" "$data/icons/hicolor/scalable/apps/mywhatsapp.svg"
+install -m644 /dev/stdin "$data/applications/mywhatsapp.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=MyWhatsApp
@@ -27,7 +31,7 @@ StartupWMClass=com-automatelinux-mywhatsapp-MainKt
 DESKTOP
 # `mywhatsapp` from a terminal: detached, so the window outlives the shell and the
 # terminal isn't filled with JVM output.
-install -Dm755 /dev/stdin /usr/local/bin/mywhatsapp <<CMD
+install -m755 /dev/stdin /usr/local/bin/mywhatsapp <<CMD
 #!/usr/bin/env bash
 exec setsid -f "$dest/bin/MyWhatsApp" "\$@" >/dev/null 2>&1
 CMD
