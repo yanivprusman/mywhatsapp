@@ -35,6 +35,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".DismissAndOpenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".WantedWatcherService"
             android:exported="false"

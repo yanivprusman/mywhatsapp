@@ -98,7 +98,11 @@ class WantedWatcherService : Service() {
             .setGroup(GROUP_POSTS)
         if (Regex("^\\d{6,15}$").matches(m.sender)) {
             AndroidPlatform.whatsAppIntent(m.sender)?.let { wa ->
-                val pi = PendingIntent.getActivity(this, id + 1, wa, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                val dismissThenOpen = Intent(this, DismissAndOpenActivity::class.java)
+                    .putExtra(DismissAndOpenActivity.EXTRA_NOTIFICATION_ID, id)
+                    .putExtra(DismissAndOpenActivity.EXTRA_TARGET, wa)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val pi = PendingIntent.getActivity(this, id + 1, dismissThenOpen, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
                 b.addAction(Notification.Action.Builder(null, "Message $sender", pi).build())
             }
         }
@@ -131,6 +135,17 @@ class WantedWatcherService : Service() {
         private const val ID_GROUP = 2
         private const val POLL_MS = 60_000L
         @Volatile private var running = false
+
+        /** Opening the app means the posts were seen — clear them, as WhatsApp does. The watcher stays. */
+        fun clearPosts(context: Context) {
+            val nm = context.getSystemService(NotificationManager::class.java)
+            nm.activeNotifications.filter { it.id != ID_WATCHER }.forEach { nm.cancel(it.id) }
+        }
+
+        /** A group summary outlives its children unless removed, and alone it still counts as a badge. */
+        fun dropEmptySummary(nm: NotificationManager) {
+            if (nm.activeNotifications.none { it.id != ID_WATCHER && it.id != ID_GROUP }) nm.cancel(ID_GROUP)
+        }
 
         fun sync(context: Context) {
             val intent = Intent(context, WantedWatcherService::class.java)
