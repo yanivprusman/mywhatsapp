@@ -85,7 +85,7 @@ object FindMessage {
     }
 }
 
-actual fun showInWhatsApp(jid: String, text: String): String? {
+actual fun showInWhatsApp(jid: String, chatName: String, text: String): String? {
     val query = FindMessage.queryFor(text)
     if (query.isEmpty() || !FindMessage.helperEnabled()) {
         // Explicit state, not a silent fallback: without the helper only the chat can be opened.

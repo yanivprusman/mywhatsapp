@@ -95,14 +95,13 @@ fun SenderSheet(chat: Chat, m: Message, onDismiss: () -> Unit, onResult: (String
                         .clip(RoundedCornerShape(10.dp)).background(c.chatBg).padding(12.dp),
                 )
             } else Spacer(Modifier.height(12.dp))
-            // The post where it was written: WhatsApp opens the group and the accessibility
-            // helper searches for the post, landing on it.
+            // The post where it was written: WhatsApp opens the group and searches for the post, landing on it.
             SheetAction(
                 Icons.AutoMirrored.Filled.OpenInNew, "Show in WhatsApp",
                 "Opens ${m.chatName ?: chat.name} at this message",
                 "sheet-show-in-whatsapp", c.brand,
             ) {
-                showInWhatsApp(m.chatJid ?: chat.jid, m.text)?.let(onResult)
+                showInWhatsApp(m.chatJid ?: chat.jid, m.chatName ?: chat.name, m.text)?.let(onResult)
                 onDismiss()
             }
             if (phone != null) {

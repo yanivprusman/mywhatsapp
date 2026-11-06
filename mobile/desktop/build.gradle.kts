@@ -56,7 +56,8 @@ compose.desktop {
             packageName = "MyWhatsApp"
             packageVersion = "1.0.0"
             // java.util.prefs is where the desktop keeps seen/filters/alerts state.
-            modules("java.prefs")
+            // java.net.http is how it talks to Chrome's DevTools for the WhatsApp Web tab.
+            modules("java.prefs", "java.net.http")
         }
     }
 }

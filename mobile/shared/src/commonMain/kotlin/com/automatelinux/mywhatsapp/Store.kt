@@ -15,11 +15,12 @@ expect fun openWhatsApp(phone: String): String?
 expect fun openWhatsAppChat(jid: String): String?
 
 /**
- * Open [jid] in WhatsApp and land on the message whose text starts with [text]: the
- * accessibility helper opens WhatsApp's in-chat search and enters it. Returns a note
- * for the user (e.g. the helper is off and only the chat was opened), or null.
+ * Open the chat [jid], named [chatName], in WhatsApp and land on the message whose text
+ * starts with [text], through WhatsApp's in-chat search (Android: an accessibility helper,
+ * by jid; desktop: the WhatsApp Web tab, which can only reach a group by its name). Returns
+ * a note for the user (e.g. the helper is off and only the chat was opened), or null.
  */
-expect fun showInWhatsApp(jid: String, text: String): String?
+expect fun showInWhatsApp(jid: String, chatName: String, text: String): String?
 
 /** Whether this device can place a call (false on the desktop — the sheet then has no Call row). */
 expect val canDial: Boolean
