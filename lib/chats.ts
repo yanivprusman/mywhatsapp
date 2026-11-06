@@ -17,6 +17,7 @@ export type ChatDef =
 
 export const CHATS: ChatDef[] = [
   { kind: "chat", id: "120363427371815253@g.us", canSend: true }, // קבוצה ריקה — the owner's own preview group
+  { kind: "chat", id: "120363429409731384@g.us", canSend: false }, // הדפסה תלת מימד
   {
     kind: "merged",
     id: "merged-snapling",
