@@ -72,6 +72,7 @@ import com.automatelinux.mywhatsapp.ui.EmptyState
 import com.automatelinux.mywhatsapp.ui.HomeTopBar
 import com.automatelinux.mywhatsapp.ui.NavTab
 import com.automatelinux.mywhatsapp.ui.OverflowMenu
+import com.automatelinux.mywhatsapp.ui.GroupsScreen
 import com.automatelinux.mywhatsapp.ui.Screen
 import com.automatelinux.mywhatsapp.ui.SelectContactScreen
 import com.automatelinux.mywhatsapp.ui.SubTopBar
@@ -203,6 +204,7 @@ private fun SubScreen(screen: Screen, onBack: () -> Unit, open: (Screen) -> Unit
     Column(Modifier.fillMaxSize().background(c.background)) {
         when (screen) {
             is Screen.Conversation -> ConversationScreen(screen.chat, screen.filter, onBack, open)
+            Screen.Groups -> GroupsScreen(onBack)
             Screen.SelectContact -> {
                 SubTopBar("Select contact", "0 contacts", onBack) {
                     BarIcon(Icons.Filled.Search, "Search", "search-contacts") { open(Screen.Empty("Search contacts", "search")) }

@@ -1,6 +1,6 @@
 import { authorize } from "@/lib/auth";
 import { query } from "@/lib/bridge";
-import { CHATS, chatNames, displayName, sourcesOf } from "@/lib/chats";
+import { chatNames, displayName, sourcesOf, visibleChats } from "@/lib/chats";
 import { isWanted } from "@/lib/filters";
 import { normalizeText } from "@/lib/merged";
 import { MESSAGE_COLUMNS, toDbTime, toMessage, withSenderNames } from "@/lib/messages";
@@ -21,15 +21,17 @@ export async function GET(req: Request) {
   const denied = authorize(req);
   if (denied) return denied;
   const after = new URL(req.url).searchParams.get("after");
-  const every = CHATS.flatMap(sourcesOf);
+  const shown = visibleChats();
+  const every = shown.flatMap(sourcesOf);
   try {
     if (!after) {
+      if (!every.length) return Response.json({ posts: [], latest: new Date().toISOString() }); // every chat switched off
       const [row] = await query(`SELECT MAX(timestamp) FROM messages WHERE chat_jid IN (${every.map(() => "?").join(",")})`, every);
       return Response.json({ posts: [], latest: row?.[0] ? String(row[0]).replace(" ", "T") : new Date().toISOString() });
     }
     const posts = [];
     let latest = after;
-    for (const def of CHATS) {
+    for (const def of shown) {
       const sources = sourcesOf(def);
       const inList = `chat_jid IN (${sources.map(() => "?").join(",")})`;
       const rows = await query(

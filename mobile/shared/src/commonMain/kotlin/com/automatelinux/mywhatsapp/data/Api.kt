@@ -43,6 +43,12 @@ data class Chat(
 
 @Serializable data class Source(val jid: String, val name: String)
 
+/** Tools → Groups: a chat the app may show, and whether it does; a merged chat's groups each have their own switch. */
+@Serializable data class GroupToggle(val id: String, val name: String, val merged: Boolean, val shown: Boolean, val sources: List<SourceToggle> = emptyList())
+@Serializable data class SourceToggle(val jid: String, val name: String, val shown: Boolean)
+@Serializable private data class GroupsResponse(val chats: List<GroupToggle>)
+@Serializable private data class GroupSwitchBody(val kind: String, val id: String, val shown: Boolean)
+
 @Serializable data class WantedPost(val chatJid: String, val chatName: String, val message: Message)
 @Serializable data class WantedResponse(val posts: List<WantedPost>, val latest: String)
 
@@ -85,6 +91,15 @@ class Api(private val baseUrl: String, private val token: String) {
     /** [ts] is the newest message shown in [jid] — unread counts after it, on every device. */
     suspend fun markSeen(jid: String, ts: String) {
         httpRequest("PUT", url("/api/chats/${enc(jid)}/state"), token, json.encodeToString(StateBody(seen = ts)))
+    }
+
+    /** Every chat the app may show, with its switch (kept on the server, shared by every device). */
+    suspend fun groups(): List<GroupToggle> =
+        json.decodeFromString<GroupsResponse>(httpRequest("GET", url("/api/groups"), token, null).decodeToString()).chats
+
+    /** Show or hide a whole chat ([source] false) or one group inside a merged chat ([source] true). */
+    suspend fun setShown(id: String, source: Boolean, shown: Boolean) {
+        httpRequest("PUT", url("/api/groups"), token, json.encodeToString(GroupSwitchBody(if (source) "source" else "chat", id, shown)))
     }
 
     /** New Wanted posts after [after]; with null, only `latest` (where a fresh watcher starts). */

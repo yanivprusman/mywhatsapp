@@ -1,5 +1,6 @@
 import "server-only";
 import { query } from "@/lib/bridge";
+import { readVisibility } from "@/lib/visibility";
 
 /**
  * The chats MyWhatsApp shows. An allowlist on purpose: the bridge holds the
@@ -31,8 +32,26 @@ export const CHATS: ChatDef[] = [
   },
 ];
 
+/**
+ * The chats as the owner chose to see them (Tools → Groups, `lib/visibility.ts`):
+ * hidden chats left out, a merged chat without its hidden groups. A merged chat
+ * whose every group is hidden is left out too — it would have nothing to show.
+ * Everything the app shows or alerts on goes through this; `CHATS` itself is
+ * only the ceiling of what may be reached.
+ */
+export function visibleChats(): ChatDef[] {
+  const { hiddenChats, hiddenSources } = readVisibility();
+  return CHATS.flatMap((def): ChatDef[] => {
+    if (hiddenChats.includes(def.id)) return [];
+    if (def.kind === "chat") return [def];
+    const sources = def.sources.filter((j) => !hiddenSources.includes(j));
+    return sources.length ? [{ ...def, sources }] : [];
+  });
+}
+
+/** A chat the owner currently sees, with only its shown groups. Hidden = not found. */
 export function findChat(id: string): ChatDef | undefined {
-  return CHATS.find((c) => c.id === id);
+  return visibleChats().find((c) => c.id === id);
 }
 
 export function sourcesOf(def: ChatDef): string[] {

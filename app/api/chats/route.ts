@@ -1,6 +1,6 @@
 import { authorize } from "@/lib/auth";
 import { query } from "@/lib/bridge";
-import { CHATS, chatNames, displayName, sourcesOf } from "@/lib/chats";
+import { chatNames, displayName, sourcesOf, visibleChats } from "@/lib/chats";
 import { clearedAt, laterOf } from "@/lib/cleared";
 import { filterOf, seenOf } from "@/lib/chatState";
 import { matches } from "@/lib/filters";
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (denied) return denied;
   try {
     const chats = await Promise.all(
-      CHATS.map(async (def) => {
+      visibleChats().map(async (def) => {
         const sources = sourcesOf(def);
         const cutoff = clearedAt(def.id);
         const inList = `chat_jid IN (${sources.map(() => "?").join(",")})` + (cutoff ? " AND timestamp > ?" : "");

@@ -217,7 +217,7 @@ fun ToolsTab(open: (Screen) -> Unit) {
         item { Box(Modifier.fillMaxWidth().height(1.dp).background(c.divider)) }
         item { SectionHeader("My tools") }
         item { WantedAlertsRow() }
-        item { PlainIconRow(Icons.Outlined.MergeType, "Merged groups", "Combine groups into one conversation", "tool-merged-groups") { open(Screen.Empty("Merged groups", "merge")) } }
+        item { PlainIconRow(Icons.Outlined.MergeType, "Groups", "Choose which chats and groups you see", "tool-groups") { open(Screen.Groups) } }
         item { PlainIconRow(Icons.Outlined.FilterAlt, "Message filters", "Show only the messages you care about", "tool-message-filters") { open(Screen.Empty("Message filters", "filter")) } }
         item { PlainIconRow(Icons.Outlined.MonitorHeart, "Diagnostics", "Connection and delivery health", "tool-diagnostics") { open(Screen.Empty("Diagnostics", "diagnostics")) } }
         item { SectionHeader("Grow your business") }
