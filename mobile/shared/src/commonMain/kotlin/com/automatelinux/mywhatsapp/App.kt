@@ -64,6 +64,7 @@ import com.automatelinux.mywhatsapp.ui.ImageCache
 import com.automatelinux.mywhatsapp.ui.LocalApi
 import com.automatelinux.mywhatsapp.ui.LocalImages
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import com.automatelinux.mywhatsapp.ui.BarIcon
 import com.automatelinux.mywhatsapp.ui.CallsTab
@@ -118,6 +119,16 @@ fun App(config: AppConfig) {
         val top = stack.lastOrNull()
         var chats by remember { mutableStateOf<List<Chat>?>(null) }
         var chatsError by remember { mutableStateOf<String?>(null) }
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        // Long-press → Hide chat: gone at once; if the server refuses, a reload brings it back.
+        val hide: (Chat) -> Unit = { ch ->
+            chats = chats?.filterNot { it.jid == ch.jid }
+            scope.launch {
+                try { api.setShown(ch.jid, source = false, shown = false) } catch (_: Exception) {
+                    try { chats = api.chats() } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
+                }
+            }
+        }
         LaunchedEffect(top == null) {
             while (top == null) {
                 try { chats = api.chats(); chatsError = null } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
@@ -153,7 +164,7 @@ fun App(config: AppConfig) {
             }
             Box(Modifier.weight(1f)) {
                 when (tab) {
-                    0 -> ChatsTab(chats, chatsError, open)
+                    0 -> ChatsTab(chats, chatsError, open, hide)
                     1 -> UpdatesTab(open)
                     2 -> ToolsTab(open)
                     else -> CallsTab(open)

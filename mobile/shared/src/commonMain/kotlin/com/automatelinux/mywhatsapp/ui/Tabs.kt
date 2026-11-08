@@ -69,7 +69,7 @@ import com.automatelinux.mywhatsapp.ui.theme.Wa
 private val chatFilters = listOf("All", "Unread", "Favourites", "Groups")
 
 @Composable
-fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit) {
+fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit, hide: (Chat) -> Unit) {
     val c = Wa.colors
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
@@ -123,7 +123,9 @@ fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit) {
                 else -> true
             }
         }
-        items(shown, key = { it.jid }) { ch -> ChatRow(ch) { open(Screen.Conversation(ch)) } }
+        items(shown, key = { it.jid }) { ch ->
+            ChatRow(ch, onClick = { open(Screen.Conversation(ch)) }, onHide = { hide(ch) }, onGroups = { open(Screen.Groups) })
+        }
         if (shown.isEmpty()) item {
             val (icon, title, body) = when {
                 chats == null && loadError != null -> Triple(Icons.Filled.ErrorOutline, "Can't reach MyWhatsApp's server", loadError)

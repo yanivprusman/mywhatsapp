@@ -1,7 +1,17 @@
 package com.automatelinux.mywhatsapp.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -99,11 +109,25 @@ fun MessagePreview(m: Message?, filter: String = "all") {
     }
 }
 
+/**
+ * A chat in the list. Long-press opens its menu: hide it (Tools → Groups brings
+ * it back) or open Groups to choose what shows — for a merged chat, which of
+ * its groups.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChatRow(chat: Chat, onClick: () -> Unit) {
+fun ChatRow(chat: Chat, onClick: () -> Unit, onHide: () -> Unit, onGroups: () -> Unit) {
     val c = Wa.colors
+    val haptic = LocalHapticFeedback.current
+    var menu by remember { mutableStateOf(false) }
+    Box {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).testTag("chat-" + chat.jid.substringBefore('@'))
+        Modifier.fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
+            )
+            .testTag("chat-" + chat.jid.substringBefore('@'))
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -138,5 +162,24 @@ fun ChatRow(chat: Chat, onClick: () -> Unit) {
                 }
             }
         }
+    }
+    DropdownMenu(
+        expanded = menu,
+        onDismissRequest = { menu = false },
+        containerColor = if (c.isDark) Color(0xFF233138) else Color.White,
+        shape = RoundedCornerShape(16.dp),
+        offset = androidx.compose.ui.unit.DpOffset(72.dp, 0.dp),
+    ) {
+        DropdownMenuItem(
+            text = { Text("Hide chat", color = c.text, fontSize = 16.sp) },
+            onClick = { menu = false; onHide() },
+            modifier = Modifier.testTag("chat-menu-hide").width(220.dp),
+        )
+        DropdownMenuItem(
+            text = { Text(if (chat.merged) "Choose groups" else "Show or hide chats", color = c.text, fontSize = 16.sp) },
+            onClick = { menu = false; onGroups() },
+            modifier = Modifier.testTag("chat-menu-groups").width(220.dp),
+        )
+    }
     }
 }
