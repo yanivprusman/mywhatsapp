@@ -4,12 +4,13 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { query } from "@/lib/bridge";
-import { directNames } from "@/lib/direct";
-import { MESSAGE_COLUMNS, toMessage } from "@/lib/messages";
+import { conversationNames, isGroupJid } from "@/lib/conversations";
+import { MESSAGE_COLUMNS, toMessage, withSenderNames } from "@/lib/messages";
 
 /**
- * The reply helper: a real Claude conversation per private chat, about how to
- * answer that chat. The owner talks to it like to a sharp friend ("תמצא מתכון
+ * The reply helper: a real Claude conversation per chat — private or group — about
+ * how to answer that chat. In a group each line carries its sender's name, since
+ * the right answer depends on who asked and whether it was asked of him. The owner talks to it like to a sharp friend ("תמצא מתכון
  * will go badly if I…"); it answers him, pushes back, and drafts replies in his
  * voice. It only drafts — the phone puts the chosen one into real WhatsApp's
  * message box and the owner presses Send there.
@@ -63,7 +64,7 @@ const SCHEMA = {
   },
 };
 
-const SYSTEM_PROMPT = `You help one man (the owner) handle his private WhatsApp conversations. Each session is about ONE of his chats: you get its recent history, and as it goes on, new messages from it. He talks to you about how to answer — the way he would with a friend who is very good with people and blunt with him.
+const SYSTEM_PROMPT = `You help one man (the owner) handle his WhatsApp conversations — private chats and groups. Each session is about ONE of his chats: you get its recent history, and as it goes on, new messages from it. In a group, each line names its sender; work out what is actually aimed at him, what is for everyone, and whether he needs to answer at all — saying "no reply needed" is a fine answer. He talks to you about how to answer — the way he would with a friend who is very good with people and blunt with him.
 
 Every turn you return:
 - "reply": what you say to HIM. Short and direct, like a chat message, in the language he wrote to you in (if he only pressed the button, English). Think about the other person: what they actually mean, what they want, how they'll take each answer, where it leads. When he proposes something that will go badly, say so and why, plainly. When he tells you something will go badly, take it seriously — work out what he means, agree or argue. Ask him a question when you truly need a fact only he has. No flattery, no hedging, no lists of considerations.
@@ -72,6 +73,7 @@ Every turn you return:
 Drafts:
 - Same language as the chat (usually Hebrew), same register and length as his own messages ("Me"): if he writes three words without punctuation, so do you. No greetings, sign-offs or emoji he doesn't use.
 - Answer what is actually open, reading the times (hours ago vs a minute ago) and quotes ("replying to …").
+- In a group, write to the group as he would there; name or quote the person he's answering when it would otherwise be unclear.
 - Genuinely different moves (e.g. agree / ask / push back), not three wordings of one. Each new turn: new drafts that take in everything he said so far; never repeat one he rejected.
 - Never invent facts about his life or plans; where a draft needs one, leave a short placeholder like [שעה] or ask him in "reply".
 - "label": 1–3 English words naming the move.
@@ -120,30 +122,34 @@ function nowLocal(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jerusalem" }).slice(0, 16);
 }
 
-/** Chat lines, oldest first, after [after] (or the last [limit]); and the newest timestamp. */
+/** Chat lines, oldest first, after [after] (or the last [limit]); and the newest timestamp. [who] names the other side of a private chat; a group's lines name each sender. */
 async function chatLines(jid: string, who: string, limit: number, after?: string): Promise<{ lines: string[]; newest: string | null }> {
   const rows = await query(
     `SELECT ${MESSAGE_COLUMNS}, (SELECT q.content FROM messages q WHERE q.id = m.quoted_id AND q.chat_jid = m.chat_jid)
      FROM messages m WHERE chat_jid = ?${after ? " AND timestamp > ?" : ""} ORDER BY timestamp DESC LIMIT ?`,
     after ? [jid, after.replace("T", " "), limit] : [jid, limit],
   );
-  const lines = rows.reverse().map((r) => {
-    const m = toMessage(r);
+  rows.reverse();
+  const group = isGroupJid(jid);
+  const named = group ? await withSenderNames(rows.map(toMessage)) : rows.map(toMessage);
+  const lines = rows.map((r, i) => {
+    const m = named[i];
     const quoted = r[8] ? ` (replying to: "${String(r[8]).slice(0, 120)}")` : "";
     const body = [mediaTag(m.mediaType, m.filename), m.text].filter(Boolean).join(" ");
-    return `[${clock(m.ts)}] ${m.fromMe ? "Me" : who}${quoted}: ${body}`;
+    const from = m.fromMe ? "Me" : group ? (m.senderName ?? "Unknown").replace(/^~ /, "") : who;
+    return `[${clock(m.ts)}] ${from}${quoted}: ${body}`;
   });
   return { lines, newest: rows.length ? String(rows[rows.length - 1][2]) : null };
 }
 
 const busy = new Set<string>();
 
-/** One turn of the helper conversation for private chat [jid]: [said] is what the owner tells it ("" = just draft). */
+/** One turn of the helper conversation for chat [jid] (private or group): [said] is what the owner tells it ("" = just draft). */
 export async function helperTurn(jid: string, said: string): Promise<Thread> {
   if (busy.has(jid)) throw new Error("the helper is still answering the last message");
   busy.add(jid);
   try {
-    const who = (await directNames([jid])).get(jid)!.replace(/^~ /, "");
+    const who = (await conversationNames([jid])).get(jid)!.replace(/^~ /, "");
     const thread = readThread(jid);
     const text = said.trim();
     let prompt: string;
@@ -157,7 +163,7 @@ export async function helperTurn(jid: string, said: string): Promise<Thread> {
       );
       seenTs = newest;
       prompt = [
-        `My private chat with ${who}. Now: ${nowLocal()}.`,
+        isGroupJid(jid) ? `My WhatsApp group "${who}". Now: ${nowLocal()}.` : `My private chat with ${who}. Now: ${nowLocal()}.`,
         style.length ? `\nMore of my own earlier messages in this chat, for my style:\n${style.map((r) => `- ${r[0]}`).reverse().join("\n")}` : "",
         `\nThe chat, oldest first:\n${lines.join("\n")}`,
         `\n${text ? `Me to you: ${text}` : "What should I send next?"}`,

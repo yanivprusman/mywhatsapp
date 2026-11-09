@@ -122,9 +122,9 @@ fun App(config: AppConfig) {
         val scope = androidx.compose.runtime.rememberCoroutineScope()
         // Long-press → Hide chat: gone at once; if the server refuses, a reload brings it back.
         val hide: (Chat) -> Unit = { ch ->
-            chats = chats?.filterNot { it.jid == ch.jid }
+            chats = chats?.filterNot { it.jid == ch.jid && it.section == ch.section }
             scope.launch {
-                try { api.setShown(ch.jid, source = false, shown = false) } catch (_: Exception) {
+                try { api.setShown(ch.jid, if (ch.section == "chats") "conversation" else "chat", shown = false) } catch (_: Exception) {
                     try { chats = api.chats() } catch (e: Exception) { chatsError = e.message ?: "unknown error" }
                 }
             }

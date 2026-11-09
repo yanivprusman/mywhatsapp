@@ -3,23 +3,26 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Which of the app's two modes the owner is in: "groups" (the groups the app was
- * built for — merged snapling, Wanted posts) or "private" (his private chats with
- * the reply helper). Kept on the server, like each chat's filter, so the phone
- * and the desktop both open where he left off. Never set = "groups", the app as
- * it was before private chats existed.
+ * Which of the app's two sides the owner is in:
+ * - "consolidated": the consolidator — the hand-picked groups (`CHATS`), merged,
+ *   filtered, with Wanted alerts;
+ * - "chats": every private chat and group of the account, each with the reply helper.
+ * Kept on the server, like each chat's filter, so the phone and the desktop both
+ * open where he left off. Never set = "consolidated", the app as it began.
+ * Before 2026-11-09 the sides were "groups" / "private"; those still read.
  */
-export type Mode = "groups" | "private";
-export const MODES: Mode[] = ["groups", "private"];
+export type Mode = "consolidated" | "chats";
+export const MODES: Mode[] = ["consolidated", "chats"];
+const OLD: Record<string, Mode> = { groups: "consolidated", private: "chats" };
 
 const FILE = path.join(process.cwd(), "data", "appMode.json");
 
 export function readMode(): Mode {
   try {
     const m = JSON.parse(readFileSync(FILE, "utf8")).mode;
-    return MODES.includes(m) ? m : "groups";
+    return MODES.includes(m) ? m : OLD[m] ?? "consolidated";
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return "groups";
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return "consolidated";
     throw e;
   }
 }

@@ -75,8 +75,9 @@ import com.automatelinux.mywhatsapp.ui.theme.Wa
 private val chatFilters = listOf("All", "Unread", "Favourites")
 
 /**
- * The two modes of the app: "groups" — the groups it was built for (merged
- * snapling, Wanted posts) — and "private" — private chats with the reply helper.
+ * The two sides of the app: "consolidated" — the hand-picked groups (merged
+ * snapling, filters, Wanted alerts) — and "chats" — every private chat and group,
+ * each with the reply helper. A group can be on both; each side has its own row.
  * The chosen mode is kept on the server and read again each time the list shows,
  * so the phone and the desktop open where the owner left off.
  */
@@ -146,14 +147,14 @@ fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit, hid
             }
         }
         val shown = (chats ?: emptyList()).filter { ch ->
-            mode != null && ch.isGroup == (mode == "groups") &&
+            mode != null && ch.section == mode &&
             (query.isBlank() || ch.name.contains(query.trim(), ignoreCase = true)) && when (filter) {
                 "Unread" -> ch.unread > 0
                 "Favourites" -> false
                 else -> true
             }
         }
-        items(shown, key = { it.jid }) { ch ->
+        items(shown, key = { it.section + "/" + it.jid }) { ch ->
             ChatRow(ch, onClick = { open(Screen.Conversation(ch)) }, onHide = { hide(ch) }, onGroups = { open(Screen.Groups) })
         }
         if (shown.isEmpty()) item {
@@ -163,7 +164,7 @@ fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit, hid
                 query.isNotBlank() -> Triple(Icons.Filled.Search, "No results", "No chats, contacts or messages found for \u201C$query\u201D.")
                 filter == "Unread" -> Triple(Icons.Outlined.MarkChatUnread, "No unread chats", "You're all caught up.")
                 filter == "Favourites" -> Triple(Icons.Outlined.StarBorder, "No favourites yet", "Add chats to Favourites so they're always easy to find.")
-                mode == "groups" -> Triple(Icons.Outlined.Groups, "No groups shown", "Tools \u2192 Groups chooses which groups you see.")
+                mode == "consolidated" -> Triple(Icons.Outlined.Groups, "No groups shown", "Tools \u2192 Groups chooses which groups you see.")
                 else -> Triple(Icons.AutoMirrored.Outlined.Chat, "No chats yet", "Your conversations will appear here.")
             }
             EmptyState(icon, title, body, Modifier.padding(top = 56.dp))
@@ -323,7 +324,7 @@ private fun WantedAlertsRow() {
     }
 }
 
-/** Groups | Private chats — two halves, the chosen one filled; each says how many unread chats it holds. */
+/** Consolidated | Chats — two halves, the chosen one filled; each says how many unread chats it holds. */
 @Composable
 private fun ModeSwitch(mode: String?, chats: List<Chat>?, onMode: (String) -> Unit) {
     val c = Wa.colors
@@ -331,9 +332,9 @@ private fun ModeSwitch(mode: String?, chats: List<Chat>?, onMode: (String) -> Un
         Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().height(44.dp)
             .clip(RoundedCornerShape(50)).background(c.chipBg).padding(3.dp),
     ) {
-        listOf("groups" to "Groups", "private" to "Private chats").forEach { (m, label) ->
+        listOf("consolidated" to "Consolidated", "chats" to "Chats").forEach { (m, label) ->
             val on = mode == m
-            val unread = chats?.count { it.isGroup == (m == "groups") && it.unread > 0 } ?: 0
+            val unread = chats?.count { it.section == m && it.unread > 0 } ?: 0
             Box(
                 Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(50))
                     .background(if (on) c.chipSelectedBg else androidx.compose.ui.graphics.Color.Transparent)

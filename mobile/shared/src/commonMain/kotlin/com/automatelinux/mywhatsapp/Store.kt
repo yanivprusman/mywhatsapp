@@ -18,6 +18,13 @@ expect fun openWhatsApp(phone: String): String?
  */
 expect fun replyInWhatsApp(phone: String, text: String): String?
 
+/**
+ * The same for a group [jid] named [chatName]. WhatsApp has no way to hand a group's message box
+ * text, so the reply is copied and the group opened, for the owner to paste and send himself.
+ * Returns a note, or null.
+ */
+expect fun replyInWhatsAppGroup(jid: String, chatName: String, text: String): String?
+
 /** Open a WhatsApp chat (a group's or a person's [jid]) in the WhatsApp app. Returns an error, or null. */
 expect fun openWhatsAppChat(jid: String): String?
 

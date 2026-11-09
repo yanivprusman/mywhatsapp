@@ -78,6 +78,9 @@ internal object WhatsAppWeb {
         if (query.isNotEmpty()) tab.landOn(query, chatName)
     }
 
+    /** Open the group [chatName] (WhatsApp Web has no link for a group: it is found by name). */
+    fun open(chatName: String) = enqueue { tab -> tab.openChat(chatName) }
+
     /** Open the private chat with [phone] (WhatsApp Web does have a link for this one). */
     fun message(phone: String) = enqueue { tab ->
         tab.navigate("${HOME}send?phone=$phone")

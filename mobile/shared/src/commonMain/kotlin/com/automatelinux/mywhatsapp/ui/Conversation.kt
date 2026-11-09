@@ -295,7 +295,7 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
         if (chat.canSend) InputBar(
             draft, { draft = it }, onSend = ::send,
             onUnavailable = { what -> hint = "$what isn't available yet — text only for now" },
-        ) else if (!chat.isGroup) ReplyHelper(chat) { hint = it } // a private chat: drafts, sent from real WhatsApp
+        ) else if (chat.helper) ReplyHelper(chat) { hint = it } // Chats side: drafts, sent from real WhatsApp
         else Spacer(Modifier.navigationBarsPadding()) // read-only: the chat runs to the bottom edge
     }
     sheetFor?.let { m -> SenderSheet(chat, m, onDismiss = { sheetFor = null }, onResult = { hint = it }) }
@@ -330,7 +330,8 @@ private fun ConversationTopBar(
             BarIcon(Icons.Outlined.Videocam, "Video call", "video-call") { open(Screen.Empty("Video call", "call")) }
             BarIcon(Icons.Filled.Call, "Voice call", "voice-call") { open(Screen.Empty("Voice call", "call")) }
         }
-        val items = listOf("Group settings", "Media, links and docs", "Search", "Mute notifications", "Wallpaper", "Clear chat") +
+        // Group settings is the consolidator's message filters: not on the Chats side.
+        val items = (if (chat.section == "chats") emptyList() else listOf("Group settings")) + listOf("Media, links and docs", "Search", "Mute notifications", "Wallpaper", "Clear chat") +
             (if (cleared) listOf("Show history") else emptyList())
         OverflowMenu(items, "overflow-chat") {
             when (it) {

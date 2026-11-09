@@ -19,6 +19,12 @@ actual fun replyInWhatsApp(phone: String, text: String): String? {
     return "Reply copied — paste it into WhatsApp"
 }
 
+actual fun replyInWhatsAppGroup(jid: String, chatName: String, text: String): String? {
+    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
+    WhatsAppWeb.open(chatName)
+    return "Reply copied — paste it in the group"
+}
+
 actual fun openWhatsAppChat(jid: String): String? { WhatsAppWeb.focus(); return null }
 
 actual fun showInWhatsApp(jid: String, chatName: String, text: String): String? { WhatsAppWeb.show(chatName, text); return null }

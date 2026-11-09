@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.automatelinux.mywhatsapp.data.Chat
 import com.automatelinux.mywhatsapp.data.HelperTurn
 import com.automatelinux.mywhatsapp.replyInWhatsApp
+import com.automatelinux.mywhatsapp.replyInWhatsAppGroup
 import com.automatelinux.mywhatsapp.ui.theme.Wa
 import kotlinx.coroutines.launch
 
@@ -127,7 +128,7 @@ fun ReplyHelper(chat: Chat, onResult: (String) -> Unit) {
                 shown.forEachIndexed { i, t ->
                     val latest = t === turns.lastOrNull()
                     if (t.role == "me") MeLine(t.text) else HelperAnswer(t, enabled = !loading, dim = !latest) { text ->
-                        replyInWhatsApp(phone, text)?.let(onResult)
+                        (if (chat.isGroup) replyInWhatsAppGroup(chat.jid, chat.name, text) else replyInWhatsApp(phone, text))?.let(onResult)
                     }
                 }
                 pending?.let { MeLine(it) }

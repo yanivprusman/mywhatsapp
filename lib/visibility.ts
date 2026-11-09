@@ -10,6 +10,9 @@ import path from "node:path";
  *   and from Wanted alerts.
  * - `hiddenSources`: one real group inside a merged chat — its posts leave the
  *   merged conversation, its count and its alerts, the other groups stay.
+ * - `hiddenConversations`: a private chat or group hidden from the Chats side
+ *   (the reply helper's). Separate from `hiddenChats` on purpose: hiding a group
+ *   from the consolidator must not take it away from the helper, and the reverse.
  *
  * Kept on the server so the phone and the desktop show the same list. This
  * narrows the allowlist in `lib/chats.ts`; it can never widen it — an id that
@@ -17,14 +20,23 @@ import path from "node:path";
  */
 const FILE = path.join(process.cwd(), "data", "visibility.json");
 
-export type Visibility = { hiddenChats: string[]; hiddenSources: string[] };
+export type Visibility = { hiddenChats: string[]; hiddenSources: string[]; hiddenConversations: string[] };
+
+const PRIVATE = /^\d{6,15}@s\.whatsapp\.net$/;
 
 export function readVisibility(): Visibility {
   try {
     const v = JSON.parse(readFileSync(FILE, "utf8"));
-    return { hiddenChats: v.hiddenChats ?? [], hiddenSources: v.hiddenSources ?? [] };
+    const hiddenChats: string[] = v.hiddenChats ?? [];
+    // Before 2026-11-09 a private chat hidden from the list was filed under hiddenChats; it belongs to Chats.
+    const moved = hiddenChats.filter((j) => PRIVATE.test(j));
+    return {
+      hiddenChats: hiddenChats.filter((j) => !PRIVATE.test(j)),
+      hiddenSources: v.hiddenSources ?? [],
+      hiddenConversations: [...new Set([...(v.hiddenConversations ?? []), ...moved])],
+    };
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return { hiddenChats: [], hiddenSources: [] };
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return { hiddenChats: [], hiddenSources: [], hiddenConversations: [] };
     throw e;
   }
 }
@@ -34,11 +46,13 @@ function toggle(list: string[], id: string, hidden: boolean): string[] {
   return hidden ? [...rest, id] : rest;
 }
 
-export function setHidden(kind: "chat" | "source", id: string, hidden: boolean) {
+export function setHidden(kind: "chat" | "source" | "conversation", id: string, hidden: boolean) {
   const v = readVisibility();
   const next: Visibility = kind === "chat"
     ? { ...v, hiddenChats: toggle(v.hiddenChats, id, hidden) }
-    : { ...v, hiddenSources: toggle(v.hiddenSources, id, hidden) };
+    : kind === "source"
+      ? { ...v, hiddenSources: toggle(v.hiddenSources, id, hidden) }
+      : { ...v, hiddenConversations: toggle(v.hiddenConversations, id, hidden) };
   mkdirSync(path.dirname(FILE), { recursive: true });
   writeFileSync(FILE + ".tmp", JSON.stringify(next, null, 2));
   renameSync(FILE + ".tmp", FILE);

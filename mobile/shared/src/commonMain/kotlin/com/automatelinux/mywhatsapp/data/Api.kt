@@ -39,12 +39,16 @@ data class Chat(
     val sources: List<Source> = emptyList(),
     val clearedAt: String? = null, // the chat was cleared up to here; older messages are hidden, not deleted
     val filter: String = "all",    // the filter it is open on; last + unread are of matching messages only
+    // Which side of the app the row belongs to: "consolidated" (hand-picked, merged, filtered) or
+    // "chats" (every private chat and group). A group can have a row on each side.
+    val section: String = "consolidated",
+    val helper: Boolean = false,   // the chat ends in the reply helper instead of a message box
 )
 
 @Serializable data class Source(val jid: String, val name: String)
 
 /** Tools → Groups: a chat the app may show, and whether it does; a merged chat's groups each have their own switch. */
-@Serializable data class GroupToggle(val id: String, val name: String, val merged: Boolean, val shown: Boolean, val sources: List<SourceToggle> = emptyList())
+@Serializable data class GroupToggle(val id: String, val name: String, val merged: Boolean, val shown: Boolean, val section: String = "consolidated", val sources: List<SourceToggle> = emptyList())
 @Serializable data class SourceToggle(val jid: String, val name: String, val shown: Boolean)
 @Serializable private data class GroupsResponse(val chats: List<GroupToggle>)
 @Serializable private data class GroupSwitchBody(val kind: String, val id: String, val shown: Boolean)
@@ -100,7 +104,7 @@ class Api(private val baseUrl: String, private val token: String) {
         httpRequest("PUT", url("/api/chats/${enc(jid)}/state"), token, json.encodeToString(StateBody(seen = ts)))
     }
 
-    /** The app's mode, "groups" or "private" — kept on the server, so every device opens where the owner left off. */
+    /** The app's side, "consolidated" or "chats" — kept on the server, so every device opens where the owner left off. */
     suspend fun mode(): String =
         json.decodeFromString<ModeBody>(httpRequest("GET", url("/api/mode"), token, null).decodeToString()).mode
 
@@ -112,9 +116,13 @@ class Api(private val baseUrl: String, private val token: String) {
     suspend fun groups(): List<GroupToggle> =
         json.decodeFromString<GroupsResponse>(httpRequest("GET", url("/api/groups"), token, null).decodeToString()).chats
 
-    /** Show or hide a whole chat ([source] false) or one group inside a merged chat ([source] true). */
-    suspend fun setShown(id: String, source: Boolean, shown: Boolean) {
-        httpRequest("PUT", url("/api/groups"), token, json.encodeToString(GroupSwitchBody(if (source) "source" else "chat", id, shown)))
+    /**
+     * Show or hide one thing. [kind]: "chat" — a consolidated chat; "source" — one group inside a
+     * merged chat; "conversation" — a private chat or group on the Chats side. Hiding on one side
+     * never touches the other.
+     */
+    suspend fun setShown(id: String, kind: String, shown: Boolean) {
+        httpRequest("PUT", url("/api/groups"), token, json.encodeToString(GroupSwitchBody(kind, id, shown)))
     }
 
     /** New Wanted posts after [after]; with null, only `latest` (where a fresh watcher starts). */

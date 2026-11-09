@@ -54,17 +54,21 @@ fun GroupsScreen(onBack: () -> Unit) {
     }
 
     // Flip at once, then tell the server; a refusal flips it back and says why.
-    fun flip(id: String, source: Boolean, shown: Boolean) {
+    // [kind]: "chat" (consolidated), "source" (a group in a merged chat) or "conversation" (Chats side).
+    fun flip(id: String, kind: String, shown: Boolean) {
         fun apply(v: Boolean) {
             groups = groups?.map { g ->
-                if (!source) { if (g.id == id) g.copy(shown = v) else g }
-                else g.copy(sources = g.sources.map { s -> if (s.jid == id) s.copy(shown = v) else s })
+                when (kind) {
+                    "source" -> g.copy(sources = g.sources.map { s -> if (s.jid == id) s.copy(shown = v) else s })
+                    "conversation" -> if (g.id == id && g.section == "chats") g.copy(shown = v) else g
+                    else -> if (g.id == id && g.section != "chats") g.copy(shown = v) else g
+                }
             }
         }
         apply(shown)
         error = null
         scope.launch {
-            try { api.setShown(id, source, shown) } catch (e: Exception) {
+            try { api.setShown(id, kind, shown) } catch (e: Exception) {
                 apply(!shown); error = "Couldn't save: " + (e.message ?: "unknown error")
             }
         }
@@ -84,8 +88,8 @@ fun GroupsScreen(onBack: () -> Unit) {
             error?.let { msg ->
                 item { Text(msg, color = c.textSecondary, fontSize = 14.sp, modifier = Modifier.padding(16.dp).testTag("groups-error")) }
             }
-            item { SectionHeader("Chats") }
-            items(list, key = { it.id }) { g ->
+            item { SectionHeader("Consolidated") }
+            items(list.filter { it.section != "chats" }, key = { "c/" + it.id }) { g ->
                 val on = g.sources.count { it.shown }
                 ToggleRow(
                     title = g.name,
@@ -98,9 +102,28 @@ fun GroupsScreen(onBack: () -> Unit) {
                     checked = g.shown,
                     tag = "group-switch-" + g.id,
                     large = true,
-                ) { flip(g.id, source = false, shown = it) }
+                ) { flip(g.id, "chat", shown = it) }
             }
-            list.filter { it.merged }.forEach { g ->
+            // The Chats side lists every chat and group, so only the ones hidden there are here, to bring back.
+            val hiddenChats = list.filter { it.section == "chats" }
+            if (hiddenChats.isNotEmpty()) {
+                item {
+                    Column {
+                        Box(Modifier.fillMaxWidth().padding(top = 12.dp).height(1.dp).background(c.divider))
+                        SectionHeader("Hidden from Chats")
+                    }
+                }
+                items(hiddenChats, key = { "h/" + it.id }) { g ->
+                    ToggleRow(
+                        title = g.name,
+                        subtitle = if (g.shown) null else "Hidden",
+                        checked = g.shown,
+                        tag = "conversation-switch-" + g.id,
+                        large = true,
+                    ) { flip(g.id, "conversation", shown = it) }
+                }
+            }
+            list.filter { it.merged && it.section != "chats" }.forEach { g ->
                 item(key = "hdr-" + g.id) {
                     Column {
                         Box(Modifier.fillMaxWidth().padding(top = 12.dp).height(1.dp).background(c.divider))
@@ -115,12 +138,12 @@ fun GroupsScreen(onBack: () -> Unit) {
                         enabled = g.shown,
                         tag = "source-switch-" + s.jid,
                         large = false,
-                    ) { flip(s.jid, source = true, shown = it) }
+                    ) { flip(s.jid, "source", shown = it) }
                 }
             }
             item {
                 Text(
-                    "Hidden chats and groups also stop sending Wanted alerts. Nothing changes in WhatsApp — you stay in every group.",
+                    "Consolidated chats switched off also stop sending Wanted alerts. Hiding a chat on one side never hides it on the other. Nothing changes in WhatsApp — you stay in every group.",
                     color = c.textSecondary, fontSize = 13.sp, lineHeight = 18.sp,
                     modifier = Modifier.padding(16.dp),
                 )

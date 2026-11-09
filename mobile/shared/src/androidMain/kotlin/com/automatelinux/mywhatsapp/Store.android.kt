@@ -63,6 +63,12 @@ actual fun replyInWhatsApp(phone: String, text: String): String? {
     return null
 }
 
+actual fun replyInWhatsAppGroup(jid: String, chatName: String, text: String): String? {
+    val cm = AndroidPlatform.context.getSystemService(android.content.ClipboardManager::class.java)
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("reply", text))
+    return openWhatsAppChat(jid) ?: "Reply copied — paste it in the group"
+}
+
 actual fun openWhatsAppChat(jid: String): String? {
     val intent = AndroidPlatform.chatIntent(jid) ?: return "WhatsApp isn't installed on this phone"
     return runCatching { AndroidPlatform.context.startActivity(intent) }.exceptionOrNull()

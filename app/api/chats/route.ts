@@ -4,7 +4,7 @@ import { chatNames, displayName, sourcesOf, visibleChats } from "@/lib/chats";
 import { clearedAt, laterOf } from "@/lib/cleared";
 import { filterOf, seenOf } from "@/lib/chatState";
 import { matches } from "@/lib/filters";
-import { directNames, recentDirects } from "@/lib/direct";
+import { conversationNames, isGroupJid, recentConversations } from "@/lib/conversations";
 import { loadMessages } from "@/lib/merged";
 import { readVisibility } from "@/lib/visibility";
 import { MESSAGE_COLUMNS, toDbTime, toMessage, withSenderNames } from "@/lib/messages";
@@ -16,10 +16,14 @@ import { MESSAGE_COLUMNS, toDbTime, toMessage, withSenderNames } from "@/lib/mes
  * A cleared chat's last line and unread count start after its cutoff.
  * A chat open on a filter has a last line and unread count of matching messages
  * only, so a chat on Wanted is not announced by a "good morning".
- * Private chats follow the groups: the DIRECT_LIMIT most recent ones (all of them
- * are reachable; the list is just as long as is worth scrolling), read-only.
+ * Two sides, told apart by `section` (the phone's mode switch):
+ * - "consolidated": the hand-picked chats of `lib/chats.ts` — merged, filtered;
+ * - "chats": the CONVERSATION_LIMIT most recent private chats and groups of the
+ *   account (all are reachable; the list is just as long as is worth scrolling),
+ *   read-only, each with the reply helper (`helper`).
+ * A group can be on both sides; each row stands alone.
  */
-const DIRECT_LIMIT = 80;
+const CONVERSATION_LIMIT = 120;
 export async function GET(req: Request) {
   const denied = authorize(req);
   if (denied) return denied;
@@ -57,6 +61,8 @@ export async function GET(req: Request) {
           isGroup: def.kind === "merged" || def.id.endsWith("@g.us"),
           merged: def.kind === "merged",
           canSend: def.kind === "chat" && def.canSend,
+          section: "consolidated" as "consolidated" | "chats",
+          helper: false,
           sources: names ? sources.map((j) => ({ jid: j, name: names.get(j) ?? j })) : [],
           clearedAt: cutoff,
           filter,
@@ -65,7 +71,7 @@ export async function GET(req: Request) {
         };
       }),
     );
-    chats.push(...(await directChats()));
+    chats.push(...(await conversationChats()));
     chats.sort((a, b) => (b.last?.ts ?? "").localeCompare(a.last?.ts ?? ""));
     return Response.json({ chats });
   } catch (e) {
@@ -73,12 +79,13 @@ export async function GET(req: Request) {
   }
 }
 
-/** The recent private chats as list rows: one query for the last lines, one for unread. */
-async function directChats() {
-  const hidden = new Set(readVisibility().hiddenChats);
-  const recent = (await recentDirects(DIRECT_LIMIT)).filter((d) => !hidden.has(d.jid));
+/** The recent conversations as list rows: one query for the last lines, one for unread. */
+async function conversationChats() {
+  const hidden = new Set(readVisibility().hiddenConversations);
+  const recent = (await recentConversations(CONVERSATION_LIMIT)).filter((d) => !hidden.has(d.jid));
   if (!recent.length) return [];
-  const names = await directNames(recent.map((d) => d.jid));
+  const names = await conversationNames(recent.map((d) => d.jid));
+  const groupLast = new Map((await withSenderNames(recent.filter((d) => isGroupJid(d.jid)).map((d) => d.last))).map((m) => [m.id, m]));
   const since = new Map(recent.flatMap((d) => {
     const s = laterOf(seenOf(d.jid), clearedAt(d.jid));
     return s ? [[d.jid, s] as const] : [];
@@ -98,13 +105,16 @@ async function directChats() {
   return recent.map(({ jid, last }) => ({
     jid,
     name: names.get(jid)!,
-    isGroup: false,
+    isGroup: isGroupJid(jid),
     merged: false,
     canSend: false,
+    section: "chats" as "consolidated" | "chats",
+    helper: true,
     sources: [] as { jid: string; name: string }[],
     clearedAt: clearedAt(jid),
     filter: "all" as const,
     unread: unread.get(jid) ?? 0,
-    last: { ...last, senderName: last.fromMe ? "You" : undefined }, // a private chat's last line has no "Name:" prefix, as in WhatsApp
+    // A group's last line says who wrote it; a private chat's has no "Name:" prefix, as in WhatsApp.
+    last: isGroupJid(jid) ? groupLast.get(last.id)! : { ...last, senderName: last.fromMe ? "You" : undefined },
   }));
 }
