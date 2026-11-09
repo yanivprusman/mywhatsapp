@@ -60,6 +60,7 @@ data class Chat(
     val clearedAt: String? = null,        // set when the chat was cleared: the page starts after it
 )
 @Serializable private data class SendBody(val text: String)
+@Serializable private data class ModeBody(val mode: String)
 
 /** The reply helper: a draft, and one turn of the owner's conversation with it ("me" = what he said; "helper" = its answer + drafts). */
 @Serializable data class Suggestion(val label: String, val text: String)
@@ -97,6 +98,14 @@ class Api(private val baseUrl: String, private val token: String) {
     /** [ts] is the newest message shown in [jid] — unread counts after it, on every device. */
     suspend fun markSeen(jid: String, ts: String) {
         httpRequest("PUT", url("/api/chats/${enc(jid)}/state"), token, json.encodeToString(StateBody(seen = ts)))
+    }
+
+    /** The app's mode, "groups" or "private" — kept on the server, so every device opens where the owner left off. */
+    suspend fun mode(): String =
+        json.decodeFromString<ModeBody>(httpRequest("GET", url("/api/mode"), token, null).decodeToString()).mode
+
+    suspend fun setMode(mode: String) {
+        httpRequest("PUT", url("/api/mode"), token, json.encodeToString(ModeBody(mode)))
     }
 
     /** Every chat the app may show, with its switch (kept on the server, shared by every device). */

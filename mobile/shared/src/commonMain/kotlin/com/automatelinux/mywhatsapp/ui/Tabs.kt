@@ -48,6 +48,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,13 +72,33 @@ import com.automatelinux.mywhatsapp.ui.theme.Wa
 // Every tab is the real WhatsApp Business layout with zero data behind it.
 // When real data arrives, the empty states are what gets replaced.
 
-private val chatFilters = listOf("All", "Unread", "Favourites", "Groups")
+private val chatFilters = listOf("All", "Unread", "Favourites")
 
+/**
+ * The two modes of the app: "groups" — the groups it was built for (merged
+ * snapling, Wanted posts) — and "private" — private chats with the reply helper.
+ * The chosen mode is kept on the server and read again each time the list shows,
+ * so the phone and the desktop open where the owner left off.
+ */
 @Composable
 fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit, hide: (Chat) -> Unit) {
     val c = Wa.colors
+    val api = LocalApi.current
+    val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
+    var mode by remember { mutableStateOf<String?>(null) }
+    var modeError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try { mode = api.mode() } catch (e: Exception) { modeError = e.message ?: "unknown error" }
+    }
+    val choose: (String) -> Unit = { m ->
+        val before = mode
+        mode = m; filter = "All"
+        scope.launch {
+            try { api.setMode(m); modeError = null } catch (e: Exception) { mode = before; modeError = "Mode not saved: ${e.message}" }
+        }
+    }
 
     LazyColumn(Modifier.fillMaxSize().background(c.background)) {
         item {
@@ -97,6 +123,10 @@ fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit, hid
             }
         }
         item {
+            ModeSwitch(mode, chats, choose)
+            modeError?.let { Text(it, color = c.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 20.dp)) }
+        }
+        item {
             LazyRow(
                 Modifier.padding(vertical = 8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
@@ -116,8 +146,8 @@ fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit, hid
             }
         }
         val shown = (chats ?: emptyList()).filter { ch ->
+            mode != null && ch.isGroup == (mode == "groups") &&
             (query.isBlank() || ch.name.contains(query.trim(), ignoreCase = true)) && when (filter) {
-                "Groups" -> ch.isGroup
                 "Unread" -> ch.unread > 0
                 "Favourites" -> false
                 else -> true
@@ -129,11 +159,11 @@ fun ChatsTab(chats: List<Chat>?, loadError: String?, open: (Screen) -> Unit, hid
         if (shown.isEmpty()) item {
             val (icon, title, body) = when {
                 chats == null && loadError != null -> Triple(Icons.Filled.ErrorOutline, "Can't reach MyWhatsApp's server", loadError)
-                chats == null -> Triple(Icons.AutoMirrored.Outlined.Chat, "Loading chats\u2026", "")
+                chats == null || mode == null -> Triple(Icons.AutoMirrored.Outlined.Chat, "Loading chats\u2026", "")
                 query.isNotBlank() -> Triple(Icons.Filled.Search, "No results", "No chats, contacts or messages found for \u201C$query\u201D.")
                 filter == "Unread" -> Triple(Icons.Outlined.MarkChatUnread, "No unread chats", "You're all caught up.")
                 filter == "Favourites" -> Triple(Icons.Outlined.StarBorder, "No favourites yet", "Add chats to Favourites so they're always easy to find.")
-                filter == "Groups" -> Triple(Icons.Outlined.Groups, "No groups yet", "Groups will appear here.")
+                mode == "groups" -> Triple(Icons.Outlined.Groups, "No groups shown", "Tools \u2192 Groups chooses which groups you see.")
                 else -> Triple(Icons.AutoMirrored.Outlined.Chat, "No chats yet", "Your conversations will appear here.")
             }
             EmptyState(icon, title, body, Modifier.padding(top = 56.dp))
@@ -290,5 +320,33 @@ private fun WantedAlertsRow() {
             ),
             modifier = Modifier.testTag("wanted-alerts-switch"),
         )
+    }
+}
+
+/** Groups | Private chats — two halves, the chosen one filled; each says how many unread chats it holds. */
+@Composable
+private fun ModeSwitch(mode: String?, chats: List<Chat>?, onMode: (String) -> Unit) {
+    val c = Wa.colors
+    Row(
+        Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().height(44.dp)
+            .clip(RoundedCornerShape(50)).background(c.chipBg).padding(3.dp),
+    ) {
+        listOf("groups" to "Groups", "private" to "Private chats").forEach { (m, label) ->
+            val on = mode == m
+            val unread = chats?.count { it.isGroup == (m == "groups") && it.unread > 0 } ?: 0
+            Box(
+                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(50))
+                    .background(if (on) c.chipSelectedBg else androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable(enabled = !on) { onMode(m) }
+                    .testTag("mode-$m"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (unread > 0) "$label \u00B7 $unread" else label,
+                    color = if (on) c.chipSelectedText else c.chipText,
+                    fontSize = 15.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
+                )
+            }
+        }
     }
 }
