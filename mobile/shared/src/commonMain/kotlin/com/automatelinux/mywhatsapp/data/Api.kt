@@ -60,6 +60,12 @@ data class Chat(
     val clearedAt: String? = null,        // set when the chat was cleared: the page starts after it
 )
 @Serializable private data class SendBody(val text: String)
+
+/** The reply helper: one draft, and a round of the owner talking to it (what he said, the drafts he got). */
+@Serializable data class Suggestion(val label: String, val text: String)
+@Serializable data class HelperRound(val said: String, val drafts: List<Suggestion>)
+@Serializable private data class SuggestBody(val said: String, val rounds: List<HelperRound>)
+@Serializable private data class SuggestResponse(val suggestions: List<Suggestion>)
 @Serializable private data class ClearBody(val upTo: String?)
 @Serializable private data class StateBody(val filter: String? = null, val seen: String? = null)
 
@@ -114,6 +120,12 @@ class Api(private val baseUrl: String, private val token: String) {
         if (after != null) q += "&after=${enc(after)}"
         return json.decodeFromString(httpRequest("GET", url(q), token, null).decodeToString())
     }
+
+    /** Drafts for the next message in private chat [jid]; [said] = what the owner tells the helper now. Nothing is sent. */
+    suspend fun suggest(jid: String, said: String, rounds: List<HelperRound>): List<Suggestion> =
+        json.decodeFromString<SuggestResponse>(
+            httpRequest("POST", url("/api/chats/${enc(jid)}/suggest"), token, json.encodeToString(SuggestBody(said, rounds))).decodeToString(),
+        ).suggestions
 
     suspend fun send(jid: String, text: String) {
         httpRequest("POST", url("/api/chats/${enc(jid)}/send"), token, json.encodeToString(SendBody(text)))

@@ -11,6 +11,13 @@ expect fun appSettings(): Settings
 /** Open WhatsApp on the chat with [phone] (digits, country code first), as its own "Message" does. Returns an error, or null. */
 expect fun openWhatsApp(phone: String): String?
 
+/**
+ * Open WhatsApp on the chat with [phone] with [text] already in its message box, for the
+ * owner to edit and send himself — the reply helper never sends. Desktop: the WhatsApp
+ * Web tab can't be handed text, so it is copied and the chat opened. Returns a note, or null.
+ */
+expect fun replyInWhatsApp(phone: String, text: String): String?
+
 /** Open a WhatsApp chat (a group's or a person's [jid]) in the WhatsApp app. Returns an error, or null. */
 expect fun openWhatsAppChat(jid: String): String?
 

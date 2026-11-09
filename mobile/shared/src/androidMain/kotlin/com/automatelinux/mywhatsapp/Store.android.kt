@@ -38,9 +38,9 @@ object AndroidPlatform {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }
 
-    fun whatsAppIntent(phone: String): Intent? {
+    fun whatsAppIntent(phone: String, text: String? = null): Intent? {
         val pkg = installedWhatsApp() ?: return null
-        val uri = Uri.parse("https://api.whatsapp.com/send?phone=$phone")
+        val uri = Uri.parse("https://api.whatsapp.com/send?phone=$phone" + (text?.let { "&text=" + Uri.encode(it) } ?: ""))
         return Intent(Intent.ACTION_VIEW, uri).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }
@@ -53,6 +53,12 @@ actual fun appSettings(): Settings = settings
 
 actual fun openWhatsApp(phone: String): String? {
     val intent = AndroidPlatform.whatsAppIntent(phone) ?: return "WhatsApp isn't installed on this phone"
+    AndroidPlatform.context.startActivity(intent)
+    return null
+}
+
+actual fun replyInWhatsApp(phone: String, text: String): String? {
+    val intent = AndroidPlatform.whatsAppIntent(phone, text) ?: return "WhatsApp isn't installed on this phone"
     AndroidPlatform.context.startActivity(intent)
     return null
 }

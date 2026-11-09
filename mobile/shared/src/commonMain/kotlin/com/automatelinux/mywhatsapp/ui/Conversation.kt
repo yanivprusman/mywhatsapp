@@ -295,7 +295,8 @@ fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, o
         if (chat.canSend) InputBar(
             draft, { draft = it }, onSend = ::send,
             onUnavailable = { what -> hint = "$what isn't available yet — text only for now" },
-        ) else Spacer(Modifier.navigationBarsPadding()) // read-only: the chat runs to the bottom edge
+        ) else if (!chat.isGroup) ReplyHelper(chat) { hint = it } // a private chat: drafts, sent from real WhatsApp
+        else Spacer(Modifier.navigationBarsPadding()) // read-only: the chat runs to the bottom edge
     }
     sheetFor?.let { m -> SenderSheet(chat, m, onDismiss = { sheetFor = null }, onResult = { hint = it }) }
 

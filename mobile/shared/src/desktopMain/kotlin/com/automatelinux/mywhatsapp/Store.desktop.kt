@@ -13,6 +13,12 @@ actual fun appSettings(): Settings = settings
 
 actual fun openWhatsApp(phone: String): String? { WhatsAppWeb.message(phone); return null }
 
+actual fun replyInWhatsApp(phone: String, text: String): String? {
+    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
+    WhatsAppWeb.message(phone)
+    return "Reply copied — paste it into WhatsApp"
+}
+
 actual fun openWhatsAppChat(jid: String): String? { WhatsAppWeb.focus(); return null }
 
 actual fun showInWhatsApp(jid: String, chatName: String, text: String): String? { WhatsAppWeb.show(chatName, text); return null }
