@@ -105,6 +105,6 @@ async function directChats() {
     clearedAt: clearedAt(jid),
     filter: "all" as const,
     unread: unread.get(jid) ?? 0,
-    last: { ...last, senderName: last.fromMe ? "You" : names.get(jid) },
+    last: { ...last, senderName: last.fromMe ? "You" : undefined }, // a private chat's last line has no "Name:" prefix, as in WhatsApp
   }));
 }
