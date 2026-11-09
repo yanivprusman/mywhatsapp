@@ -17,7 +17,7 @@ actual suspend fun httpRequest(method: String, url: String, token: String, jsonB
         try {
             conn.requestMethod = method
             conn.connectTimeout = 10_000
-            conn.readTimeout = 60_000
+            conn.readTimeout = 190_000 // the reply helper can think for up to 3 minutes
             conn.setRequestProperty("Authorization", "Bearer $token")
             if (jsonBody != null) {
                 conn.doOutput = true

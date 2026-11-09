@@ -61,11 +61,11 @@ data class Chat(
 )
 @Serializable private data class SendBody(val text: String)
 
-/** The reply helper: one draft, and a round of the owner talking to it (what he said, the drafts he got). */
+/** The reply helper: a draft, and one turn of the owner's conversation with it ("me" = what he said; "helper" = its answer + drafts). */
 @Serializable data class Suggestion(val label: String, val text: String)
-@Serializable data class HelperRound(val said: String, val drafts: List<Suggestion>)
-@Serializable private data class SuggestBody(val said: String, val rounds: List<HelperRound>)
-@Serializable private data class SuggestResponse(val suggestions: List<Suggestion>)
+@Serializable data class HelperTurn(val role: String, val text: String, val drafts: List<Suggestion> = emptyList(), val ts: String = "")
+@Serializable private data class HelperBody(val said: String)
+@Serializable private data class HelperResponse(val turns: List<HelperTurn>)
 @Serializable private data class ClearBody(val upTo: String?)
 @Serializable private data class StateBody(val filter: String? = null, val seen: String? = null)
 
@@ -121,11 +121,20 @@ class Api(private val baseUrl: String, private val token: String) {
         return json.decodeFromString(httpRequest("GET", url(q), token, null).decodeToString())
     }
 
-    /** Drafts for the next message in private chat [jid]; [said] = what the owner tells the helper now. Nothing is sent. */
-    suspend fun suggest(jid: String, said: String, rounds: List<HelperRound>): List<Suggestion> =
-        json.decodeFromString<SuggestResponse>(
-            httpRequest("POST", url("/api/chats/${enc(jid)}/suggest"), token, json.encodeToString(SuggestBody(said, rounds))).decodeToString(),
-        ).suggestions
+    /** The helper conversation about private chat [jid], kept on the server (empty when none started). */
+    suspend fun helper(jid: String): List<HelperTurn> =
+        json.decodeFromString<HelperResponse>(httpRequest("GET", url("/api/chats/${enc(jid)}/helper"), token, null).decodeToString()).turns
+
+    /** Tell the helper [said] ("" = just draft) and get the whole conversation back. Nothing is sent to the chat. */
+    suspend fun helperSay(jid: String, said: String): List<HelperTurn> =
+        json.decodeFromString<HelperResponse>(
+            httpRequest("POST", url("/api/chats/${enc(jid)}/helper"), token, json.encodeToString(HelperBody(said))).decodeToString(),
+        ).turns
+
+    /** Start over: the next turn begins a fresh helper conversation. */
+    suspend fun helperReset(jid: String) {
+        httpRequest("DELETE", url("/api/chats/${enc(jid)}/helper"), token, null)
+    }
 
     suspend fun send(jid: String, text: String) {
         httpRequest("POST", url("/api/chats/${enc(jid)}/send"), token, json.encodeToString(SendBody(text)))
