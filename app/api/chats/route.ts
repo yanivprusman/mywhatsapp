@@ -4,7 +4,9 @@ import { chatNames, displayName, sourcesOf, visibleChats } from "@/lib/chats";
 import { clearedAt, laterOf } from "@/lib/cleared";
 import { filterOf, seenOf } from "@/lib/chatState";
 import { matches } from "@/lib/filters";
+import { directNames, recentDirects } from "@/lib/direct";
 import { loadMessages } from "@/lib/merged";
+import { readVisibility } from "@/lib/visibility";
 import { MESSAGE_COLUMNS, toDbTime, toMessage, withSenderNames } from "@/lib/messages";
 
 /**
@@ -14,7 +16,10 @@ import { MESSAGE_COLUMNS, toDbTime, toMessage, withSenderNames } from "@/lib/mes
  * A cleared chat's last line and unread count start after its cutoff.
  * A chat open on a filter has a last line and unread count of matching messages
  * only, so a chat on Wanted is not announced by a "good morning".
+ * Private chats follow the groups: the DIRECT_LIMIT most recent ones (all of them
+ * are reachable; the list is just as long as is worth scrolling), read-only.
  */
+const DIRECT_LIMIT = 80;
 export async function GET(req: Request) {
   const denied = authorize(req);
   if (denied) return denied;
@@ -60,9 +65,46 @@ export async function GET(req: Request) {
         };
       }),
     );
+    chats.push(...(await directChats()));
     chats.sort((a, b) => (b.last?.ts ?? "").localeCompare(a.last?.ts ?? ""));
     return Response.json({ chats });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 502 });
   }
+}
+
+/** The recent private chats as list rows: one query for the last lines, one for unread. */
+async function directChats() {
+  const hidden = new Set(readVisibility().hiddenChats);
+  const recent = (await recentDirects(DIRECT_LIMIT)).filter((d) => !hidden.has(d.jid));
+  if (!recent.length) return [];
+  const names = await directNames(recent.map((d) => d.jid));
+  const since = new Map(recent.flatMap((d) => {
+    const s = laterOf(seenOf(d.jid), clearedAt(d.jid));
+    return s ? [[d.jid, s] as const] : [];
+  }));
+  const unread = new Map<string, number>();
+  if (since.size) {
+    const jids = [...since.keys()];
+    const oldest = [...since.values()].reduce((a, b) => (Date.parse(a) < Date.parse(b) ? a : b));
+    const rows = await query(
+      `SELECT chat_jid, timestamp FROM messages WHERE chat_jid IN (${jids.map(() => "?").join(",")}) AND NOT is_from_me AND timestamp > ?`,
+      [...jids, toDbTime(oldest)],
+    );
+    for (const [jid, ts] of rows) {
+      if (Date.parse(String(ts).replace(" ", "T")) > Date.parse(since.get(String(jid))!)) unread.set(String(jid), (unread.get(String(jid)) ?? 0) + 1);
+    }
+  }
+  return recent.map(({ jid, last }) => ({
+    jid,
+    name: names.get(jid)!,
+    isGroup: false,
+    merged: false,
+    canSend: false,
+    sources: [] as { jid: string; name: string }[],
+    clearedAt: clearedAt(jid),
+    filter: "all" as const,
+    unread: unread.get(jid) ?? 0,
+    last: { ...last, senderName: last.fromMe ? "You" : names.get(jid) },
+  }));
 }

@@ -1,5 +1,6 @@
 import { authorize } from "@/lib/auth";
 import { CHATS, chatNames, displayName } from "@/lib/chats";
+import { directNames, isDirect } from "@/lib/direct";
 import { readVisibility, setHidden } from "@/lib/visibility";
 
 /**
@@ -8,7 +9,9 @@ import { readVisibility, setHidden } from "@/lib/visibility";
  *
  * GET → `{chats: [{id, name, merged, shown, sources: [{jid, name, shown}]}]}`
  * PUT `{kind: "chat"|"source", id, shown}` → switch one on or off.
- * Only ids already in the allowlist (`lib/chats.ts`) are accepted.
+ * Only ids already in the allowlist (`lib/chats.ts`) or private chats are accepted.
+ * Private chats are all shown unless hidden, so only the hidden ones are listed —
+ * that is where a private chat hidden from the chat list comes back from.
  */
 export async function GET(req: Request) {
   const denied = authorize(req);
@@ -28,6 +31,9 @@ export async function GET(req: Request) {
           : [],
       };
     }));
+    const hiddenDirect = hiddenChats.filter(isDirect);
+    const names = await directNames(hiddenDirect);
+    for (const id of hiddenDirect) chats.push({ id, name: names.get(id)!, merged: false, shown: false, sources: [] });
     return Response.json({ chats });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 502 });
@@ -43,7 +49,7 @@ export async function PUT(req: Request) {
     return Response.json({ error: 'body must be {kind: "chat"|"source", id: string, shown: boolean}' }, { status: 400 });
   }
   const known = kind === "chat"
-    ? CHATS.some((c) => c.id === id)
+    ? isDirect(id) || CHATS.some((c) => c.id === id)
     : CHATS.some((c) => c.kind === "merged" && c.sources.includes(id));
   if (!known) return Response.json({ error: `not a ${kind === "chat" ? "chat" : "merged group"} this app lists: ${id}` }, { status: 404 });
   try {
