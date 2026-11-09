@@ -18,7 +18,7 @@ rm -rf "$dest"; mv "$dest.new" "$dest"
 # symlink into automateLinux, and -D wiped every other launcher in the dock.
 mkdir -p "$data/icons/hicolor/scalable/apps" "$data/applications" /usr/local/bin
 install -m644 "$here/src/jvmMain/resources/mywhatsapp.svg" "$data/icons/hicolor/scalable/apps/mywhatsapp.svg"
-install -m644 /dev/stdin "$data/applications/mywhatsapp.desktop" <<DESKTOP
+cat > "$data/applications/mywhatsapp.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=MyWhatsApp
@@ -29,12 +29,14 @@ Terminal=false
 Categories=Network;Chat;
 StartupWMClass=com-automatelinux-mywhatsapp-MainKt
 DESKTOP
+chmod 644 "$data/applications/mywhatsapp.desktop"
 # `mywhatsapp` from a terminal: detached, so the window outlives the shell and the
 # terminal isn't filled with JVM output.
-install -m755 /dev/stdin /usr/local/bin/mywhatsapp <<CMD
+cat > /usr/local/bin/mywhatsapp <<CMD
 #!/usr/bin/env bash
 exec setsid -f "$dest/bin/MyWhatsApp" "\$@" >/dev/null 2>&1
 CMD
+chmod 755 /usr/local/bin/mywhatsapp
 update-desktop-database "$data/applications" 2>/dev/null || true
 gtk-update-icon-cache -q "$data/icons/hicolor" 2>/dev/null || true
 echo "Installed: $dest/bin/MyWhatsApp (launcher: MyWhatsApp, command: mywhatsapp)"
