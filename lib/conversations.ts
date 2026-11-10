@@ -45,16 +45,48 @@ export async function ownJid(): Promise<string> {
   return own;
 }
 
-/** The [limit] conversations (private and group) with the newest messages, each with that newest message. */
+/**
+ * The chats archived in WhatsApp, as this app's jids. whatsmeow keeps the account's
+ * chat settings in sync from app state (`whatsmeow_chat_settings.archived`), so this
+ * follows WhatsApp live: archive or unarchive on the phone and the list follows.
+ * Groups are stored under their `@g.us` jid; private chats under the person's `@lid`,
+ * which `whatsmeow_lid_map` turns into the phone jid the messages are stored under.
+ * An archived `@lid` with no mapping has no messages here either, so it never lists.
+ */
+export async function archivedJids(): Promise<Set<string>> {
+  const rows = await query(
+    `SELECT s.chat_jid, m.pn FROM whatsmeow_chat_settings s
+     LEFT JOIN whatsmeow_lid_map m ON s.chat_jid = m.lid || '@lid'
+     WHERE s.archived`,
+    [],
+    "whatsmeow",
+  );
+  const out = new Set<string>();
+  for (const [jid, pn] of rows) {
+    const j = String(jid);
+    if (j.endsWith("@lid")) {
+      if (pn) out.add(`${pn}@s.whatsapp.net`);
+    } else out.add(j);
+  }
+  return out;
+}
+
+/**
+ * The [limit] conversations (private and group) with the newest messages, each with
+ * that newest message. Chats archived in WhatsApp are left out, as WhatsApp's own
+ * chat list leaves them out — and before the limit, so they don't use up its places.
+ */
 export async function recentConversations(limit: number): Promise<{ jid: string; last: WireMessage }[]> {
   const me = await ownJid();
+  const archived = [...(await archivedJids())];
   const rows = await query(
     `SELECT ${MESSAGE_COLUMNS}, m.chat_jid FROM messages m
      JOIN (SELECT chat_jid, MAX(timestamp) t FROM messages
            WHERE (chat_jid LIKE '%@s.whatsapp.net' OR chat_jid LIKE '%@g.us') AND chat_jid != ?
+             ${archived.length ? `AND chat_jid NOT IN (${archived.map(() => "?").join(",")})` : ""}
            GROUP BY chat_jid ORDER BY t DESC LIMIT ?) x
        ON m.chat_jid = x.chat_jid AND m.timestamp = x.t`,
-    [me, limit],
+    [me, ...archived, limit],
   );
   const seen = new Set<string>();
   const out: { jid: string; last: WireMessage }[] = [];
