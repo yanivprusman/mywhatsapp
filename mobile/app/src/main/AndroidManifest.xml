@@ -43,6 +43,20 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- Other apps (IoT Tracker) ask for a message to be shown in WhatsApp. -->
+        <activity
+            android:name=".ShowMessageActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="com.automatelinux.mywhatsapp.SHOW_MESSAGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".WantedWatcherService"
             android:exported="false"
