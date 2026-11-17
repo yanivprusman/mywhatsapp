@@ -14,10 +14,10 @@ actual object VoicePlayer {
     private var playedMs = 0L    // played before that stretch
     private var paused = false
 
-    actual var current: String? = null
-        private set
-    actual var durationMs: Int = 0
-        private set
+    private var loaded: String? = null
+    private var length = 0
+    actual val current: String? get() = loaded
+    actual val durationMs: Int get() = length
     actual val playing: Boolean get() = process?.isAlive == true && !paused
     actual val positionMs: Int
         get() {
@@ -29,9 +29,9 @@ actual object VoicePlayer {
     actual fun play(key: String, bytes: ByteArray) {
         stop()
         val f = File.createTempFile("mywhatsapp-voice-", ".ogg").apply { deleteOnExit(); writeBytes(bytes) }
-        durationMs = probeMs(f)
+        length = probeMs(f)
         file = f
-        current = key
+        loaded = key
         start(0)
     }
 
@@ -68,8 +68,8 @@ actual object VoicePlayer {
         process = null
         file?.delete()
         file = null
-        current = null
-        durationMs = 0
+        loaded = null
+        length = 0
         playedMs = 0
         paused = false
     }

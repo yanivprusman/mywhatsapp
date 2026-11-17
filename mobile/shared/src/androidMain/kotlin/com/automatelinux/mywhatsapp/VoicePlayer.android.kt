@@ -8,8 +8,8 @@ actual object VoicePlayer {
     private var player: MediaPlayer? = null
     private var finished = false
 
-    actual var current: String? = null
-        private set
+    private var loaded: String? = null
+    actual val current: String? get() = loaded
     actual val playing: Boolean get() = player?.isPlaying == true
     actual val positionMs: Int get() = player?.let { if (finished) it.duration else it.currentPosition } ?: 0
     actual val durationMs: Int get() = player?.duration?.coerceAtLeast(0) ?: 0
@@ -35,7 +35,7 @@ actual object VoicePlayer {
         }
         p.setOnCompletionListener { finished = true }
         player = p
-        current = key
+        loaded = key
         finished = false
         p.start()
     }
@@ -56,7 +56,7 @@ actual object VoicePlayer {
     actual fun stop() {
         player?.release()
         player = null
-        current = null
+        loaded = null
         finished = false
     }
 }
