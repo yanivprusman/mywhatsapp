@@ -5,6 +5,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Pause
+import com.automatelinux.mywhatsapp.VoicePlayer
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -104,6 +107,8 @@ import kotlinx.datetime.Clock
 @Composable
 fun ConversationScreen(chat: Chat, initialFilter: String?, onBack: () -> Unit, open: (Screen) -> Unit) {
     val c = Wa.colors
+    // A voice message stops when its chat is left, as in WhatsApp (not when its bubble scrolls away).
+    DisposableEffect(chat.jid) { onDispose { VoicePlayer.stop() } }
     val api = LocalApi.current
     val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf<Message>() } // newest first
@@ -643,7 +648,7 @@ private fun MediaTile(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 @Composable
 private fun AudioContent(chat: Chat, m: Message) {
     Column {
-        AudioBar()
+        AudioBar(chat, m)
         VoiceTranscript(chat, m)
     }
 }
@@ -755,20 +760,93 @@ private fun TranscriptDialog(text: String?, working: Boolean, error: String?, on
     )
 }
 
+/**
+ * The voice message itself: play/pause, the waveform filling as it plays, and the
+ * time. The bytes come from the same server route as photos (the bridge keeps them).
+ */
 @Composable
-private fun AudioBar() {
+private fun AudioBar(chat: Chat, m: Message) {
     val c = Wa.colors
-    Row(Modifier.widthIn(min = 240.dp).padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.PlayArrow, "Play", tint = c.textSecondary, modifier = Modifier.size(34.dp))
-        Row(Modifier.weight(1f).padding(horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-            listOf(6, 12, 18, 10, 22, 14, 8, 16, 24, 12, 6, 14, 20, 10, 8, 16, 12, 6, 10, 14).forEach { h ->
-                Box(Modifier.width(3.dp).height(h.dp).clip(RoundedCornerShape(2.dp)).background(c.bubbleMeta))
-            }
-        }
-        Box(Modifier.size(40.dp).clip(CircleShape).background(c.brand), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.Mic, null, tint = Color.White, modifier = Modifier.size(22.dp))
+    val api = LocalApi.current
+    val scope = rememberCoroutineScope()
+    var loading by remember(m.id) { mutableStateOf(false) }
+    var error by remember(m.id) { mutableStateOf<String?>(null) }
+    // Mirrors of the player, refreshed on a short tick while this message is the one loaded.
+    var mine by remember(m.id) { mutableStateOf(VoicePlayer.current == m.id) }
+    var playing by remember(m.id) { mutableStateOf(mine && VoicePlayer.playing) }
+    var position by remember(m.id) { mutableStateOf(0) }
+    var duration by remember(m.id) { mutableStateOf(0) }
+    LaunchedEffect(m.id, mine, playing) {
+        while (mine) {
+            mine = VoicePlayer.current == m.id
+            playing = mine && VoicePlayer.playing
+            if (mine) { position = VoicePlayer.positionMs; duration = VoicePlayer.durationMs }
+            delay(if (playing) 100 else 400)
         }
     }
+
+    fun toggle() {
+        error = null
+        when {
+            mine && playing -> { VoicePlayer.pause(); playing = false }
+            mine -> { VoicePlayer.resume(); playing = true }
+            else -> scope.launch {
+                loading = true
+                try {
+                    val bytes = api.media(m.chatJid ?: chat.jid, m.id)
+                    VoicePlayer.play(m.id, bytes)
+                    duration = VoicePlayer.durationMs
+                    mine = true
+                    playing = true
+                } catch (e: Exception) {
+                    error = e.message ?: "Couldn't play this voice message"
+                } finally {
+                    loading = false
+                }
+            }
+        }
+    }
+
+    Column {
+        Row(Modifier.widthIn(min = 240.dp).padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).clickable(enabled = !loading) { toggle() }
+                    .testTag(if (playing) "voice-pause" else "voice-play"),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (loading) CircularProgressIndicator(color = c.brand, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                else Icon(
+                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    if (playing) "Pause" else "Play", tint = c.textSecondary, modifier = Modifier.size(34.dp),
+                )
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
+                val bars = listOf(6, 12, 18, 10, 22, 14, 8, 16, 24, 12, 6, 14, 20, 10, 8, 16, 12, 6, 10, 14)
+                val done = if (mine && duration > 0) position.toFloat() / duration else 0f
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    bars.forEachIndexed { i, h ->
+                        val played = (i + 0.5f) / bars.size <= done
+                        Box(Modifier.width(3.dp).height(h.dp).clip(RoundedCornerShape(2.dp)).background(if (played) c.brand else c.bubbleMeta))
+                    }
+                }
+                if (mine && duration > 0) {
+                    Text(
+                        clockOf(if (playing || position in 1 until duration) position else duration),
+                        color = c.bubbleMeta, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+            }
+            Box(Modifier.size(40.dp).clip(CircleShape).background(c.brand), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Mic, null, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+        }
+        error?.let { Text(it, color = Color(0xFFEA0038), fontSize = 13.sp, modifier = Modifier.widthIn(max = 260.dp).padding(horizontal = 6.dp)) }
+    }
+}
+
+private fun clockOf(ms: Int): String {
+    val s = ms / 1000
+    return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
 }
 
 @Composable
