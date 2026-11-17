@@ -510,7 +510,7 @@ private fun Bubble(chat: Chat, m: Message, firstOfRun: Boolean, showKind: Boolea
             when (m.mediaType) {
                 "image" -> ImageContent(chat, m)
                 "video" -> MediaTile(Icons.Filled.PlayArrow, "Video")
-                "audio" -> AudioContent()
+                "audio" -> AudioContent(chat, m)
                 "document" -> DocumentContent(m)
             }
             if (m.text.isBlank() && m.mediaType.isEmpty()) {
@@ -636,7 +636,72 @@ private fun MediaTile(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 }
 
 @Composable
-private fun AudioContent() {
+private fun AudioContent(chat: Chat, m: Message) {
+    Column {
+        AudioBar()
+        VoiceTranscript(chat, m)
+    }
+}
+
+/**
+ * The words of a voice message, on request. Tapping Transcribe asks the server, which
+ * runs the machine's whisper and keeps the text, so it is made once and every device
+ * shows it after. Whisper can take a minute or more on a long note, so the server
+ * answers at once and this asks again every few seconds until the text is there.
+ */
+@Composable
+private fun VoiceTranscript(chat: Chat, m: Message) {
+    val c = Wa.colors
+    val api = LocalApi.current
+    val scope = rememberCoroutineScope()
+    val jid = m.chatJid ?: chat.jid
+    var text by remember(m.id, m.transcript) { mutableStateOf(m.transcript) }
+    var working by remember(m.id) { mutableStateOf(false) }
+    var error by remember(m.id) { mutableStateOf<String?>(null) }
+    val shown = text
+    when {
+        shown != null -> Text(
+            shown, color = c.text, fontSize = 15.sp, lineHeight = 20.sp,
+            style = TextStyle(textDirection = TextDirection.Content, textAlign = TextAlign.Start),
+            modifier = Modifier.widthIn(max = 280.dp).padding(start = 6.dp, end = 6.dp, top = 2.dp).testTag("voice-transcript"),
+        )
+        working -> Row(Modifier.padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(color = c.brand, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Transcribing…", color = c.bubbleMeta, fontSize = 14.sp)
+        }
+        else -> Column(Modifier.padding(start = 6.dp, end = 6.dp, top = 2.dp)) {
+            error?.let { Text(it, color = Color(0xFFEA0038), fontSize = 13.sp, modifier = Modifier.widthIn(max = 260.dp)) }
+            Text(
+                if (error == null) "Transcribe" else "Try again", color = c.link, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.clip(RoundedCornerShape(4.dp)).testTag("transcribe-voice")
+                    .clickable {
+                        working = true
+                        error = null
+                        scope.launch {
+                            try {
+                                var r = api.startTranscript(jid, m.id)
+                                while (r.status == "working") {
+                                    delay(3_000)
+                                    r = api.transcript(jid, m.id)
+                                }
+                                if (r.status == "done" && r.text != null) text = r.text
+                                else error = r.error ?: "Couldn't transcribe this voice message"
+                            } catch (e: Exception) {
+                                error = e.message ?: "Couldn't reach the server"
+                            } finally {
+                                working = false
+                            }
+                        }
+                    }
+                    .padding(vertical = 4.dp, horizontal = 2.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AudioBar() {
     val c = Wa.colors
     Row(Modifier.widthIn(min = 240.dp).padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.PlayArrow, "Play", tint = c.textSecondary, modifier = Modifier.size(34.dp))

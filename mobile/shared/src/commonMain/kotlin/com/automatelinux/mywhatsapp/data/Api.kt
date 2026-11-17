@@ -22,6 +22,7 @@ data class Message(
     val chatName: String? = null,  // merged chats: that group's name
     val repeats: Int? = null,      // merged chats: times this person posted this text
     val alsoIn: List<String>? = null,
+    val transcript: String? = null, // voice messages: the text, once someone asked for it
     // Local-only: a message the phone sent that the bridge has not echoed back yet.
     val pending: Boolean = false,
     val failed: Boolean = false,
@@ -63,6 +64,8 @@ data class Chat(
     val counts: Map<String, Int>? = null, // first page only: matches per filter over the whole chat
     val clearedAt: String? = null,        // set when the chat was cleared: the page starts after it
 )
+/** Where a voice message's transcript stands: "done" (with text), "working", "failed" (with error) or "none". */
+@Serializable data class Transcript(val status: String, val text: String? = null, val error: String? = null)
 @Serializable private data class SendBody(val text: String)
 @Serializable private data class ModeBody(val mode: String)
 
@@ -166,6 +169,13 @@ class Api(private val baseUrl: String, private val token: String) {
     suspend fun restoreHistory(jid: String) {
         httpRequest("DELETE", url("/api/chats/${enc(jid)}/clear"), token, null)
     }
+
+    /** Start transcribing a voice message; the server answers at once and keeps working. */
+    suspend fun startTranscript(jid: String, id: String): Transcript =
+        json.decodeFromString(httpRequest("POST", url("/api/chats/${enc(jid)}/media/${enc(id)}/transcript"), token, null).decodeToString())
+
+    suspend fun transcript(jid: String, id: String): Transcript =
+        json.decodeFromString(httpRequest("GET", url("/api/chats/${enc(jid)}/media/${enc(id)}/transcript"), token, null).decodeToString())
 
     suspend fun media(jid: String, id: String): ByteArray =
         httpRequest("GET", url("/api/chats/${enc(jid)}/media/${enc(id)}"), token, null)

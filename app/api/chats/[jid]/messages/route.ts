@@ -4,6 +4,7 @@ import { clearedAt, laterOf } from "@/lib/cleared";
 import { FILTERS, type Filter, isAvailable, isWanted, matches } from "@/lib/filters";
 import { loadMessages } from "@/lib/merged";
 import { withSenderNames } from "@/lib/messages";
+import { transcriptsFor } from "@/lib/transcripts";
 
 /**
  * Newest first. `before=<ts>` pages back into history; `after=<ts>` returns only
@@ -35,9 +36,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ jid: str
     const all = await loadMessages(def, from ? { after: from } : {});
     const inRange = before ? all.filter((m) => m.ts < before) : all;
     const hits = inRange.filter((m) => matches(filter, m));
-    const messages = (await withSenderNames(hits.slice(0, limit))).map((m) => ({
+    const page = await withSenderNames(hits.slice(0, limit));
+    // A voice message carries its transcript once one has been made (on request, see lib/transcripts).
+    const chatOf = new Map(page.map((m) => [m.id, (m as { chatJid?: string }).chatJid ?? jid]));
+    const transcripts = transcriptsFor((id) => chatOf.get(id) ?? jid, page.filter((m) => m.mediaType === "audio").map((m) => m.id));
+    const messages = page.map((m) => ({
       ...m,
       kind: isWanted(m) ? "wanted" : isAvailable(m) ? "available" : null,
+      ...(transcripts.has(m.id) ? { transcript: transcripts.get(m.id) } : {}),
     }));
     const counts = !before && !after
       ? Object.fromEntries(FILTERS.map((f) => [f, all.filter((m) => matches(f, m)).length]))
