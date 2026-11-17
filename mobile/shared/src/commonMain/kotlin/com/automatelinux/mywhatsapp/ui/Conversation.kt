@@ -1,5 +1,10 @@
 package com.automatelinux.mywhatsapp.ui
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -644,10 +649,12 @@ private fun AudioContent(chat: Chat, m: Message) {
 }
 
 /**
- * The words of a voice message, on request. Tapping Transcribe asks the server, which
- * runs the machine's whisper and keeps the text, so it is made once and every device
- * shows it after. Whisper can take a minute or more on a long note, so the server
- * answers at once and this asks again every few seconds until the text is there.
+ * The words of a voice message, on request, shown in a dialog — the bubble keeps
+ * only a link, so a long note doesn't turn the chat into a wall of text. Tapping
+ * Transcribe asks the server, which runs the machine's whisper and keeps the text,
+ * so it is made once and every device shows it after. Whisper can take a minute or
+ * more on a long note, so the server answers at once and this asks again every few
+ * seconds; the dialog opens straight away and fills in when the text arrives.
  */
 @Composable
 private fun VoiceTranscript(chat: Chat, m: Message) {
@@ -658,46 +665,94 @@ private fun VoiceTranscript(chat: Chat, m: Message) {
     var text by remember(m.id, m.transcript) { mutableStateOf(m.transcript) }
     var working by remember(m.id) { mutableStateOf(false) }
     var error by remember(m.id) { mutableStateOf<String?>(null) }
-    val shown = text
-    when {
-        shown != null -> Text(
-            shown, color = c.text, fontSize = 15.sp, lineHeight = 20.sp,
-            style = TextStyle(textDirection = TextDirection.Content, textAlign = TextAlign.Start),
-            modifier = Modifier.widthIn(max = 280.dp).padding(start = 6.dp, end = 6.dp, top = 2.dp).testTag("voice-transcript"),
-        )
-        working -> Row(Modifier.padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(color = c.brand, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Transcribing…", color = c.bubbleMeta, fontSize = 14.sp)
-        }
-        else -> Column(Modifier.padding(start = 6.dp, end = 6.dp, top = 2.dp)) {
-            error?.let { Text(it, color = Color(0xFFEA0038), fontSize = 13.sp, modifier = Modifier.widthIn(max = 260.dp)) }
-            Text(
-                if (error == null) "Transcribe" else "Try again", color = c.link, fontSize = 14.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.clip(RoundedCornerShape(4.dp)).testTag("transcribe-voice")
-                    .clickable {
-                        working = true
-                        error = null
-                        scope.launch {
-                            try {
-                                var r = api.startTranscript(jid, m.id)
-                                while (r.status == "working") {
-                                    delay(3_000)
-                                    r = api.transcript(jid, m.id)
-                                }
-                                if (r.status == "done" && r.text != null) text = r.text
-                                else error = r.error ?: "Couldn't transcribe this voice message"
-                            } catch (e: Exception) {
-                                error = e.message ?: "Couldn't reach the server"
-                            } finally {
-                                working = false
-                            }
-                        }
-                    }
-                    .padding(vertical = 4.dp, horizontal = 2.dp),
-            )
+    var open by remember(m.id) { mutableStateOf(false) }
+
+    fun start() {
+        working = true
+        error = null
+        scope.launch {
+            try {
+                var r = api.startTranscript(jid, m.id)
+                while (r.status == "working") {
+                    delay(3_000)
+                    r = api.transcript(jid, m.id)
+                }
+                if (r.status == "done" && r.text != null) text = r.text
+                else error = r.error ?: "Couldn't transcribe this voice message"
+            } catch (e: Exception) {
+                error = e.message ?: "Couldn't reach the server"
+            } finally {
+                working = false
+            }
         }
     }
+
+    Row(
+        Modifier.padding(start = 4.dp, end = 6.dp, top = 2.dp).clip(RoundedCornerShape(4.dp))
+            .testTag(if (text != null) "show-transcript" else "transcribe-voice")
+            .clickable {
+                open = true
+                if (text == null && !working) start()
+            }
+            .padding(vertical = 4.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (working) {
+            CircularProgressIndicator(color = c.brand, strokeWidth = 2.dp, modifier = Modifier.size(13.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            when {
+                text != null -> "Show transcript"
+                working -> "Transcribing…"
+                else -> "Transcribe"
+            },
+            color = c.link, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+        )
+    }
+
+    if (open) TranscriptDialog(
+        text = text, working = working, error = error,
+        onRetry = { start() }, onDismiss = { open = false },
+    )
+}
+
+@Composable
+private fun TranscriptDialog(text: String?, working: Boolean, error: String?, onRetry: () -> Unit, onDismiss: () -> Unit) {
+    val c = Wa.colors
+    val clipboard = LocalClipboardManager.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.background,
+        title = { Text("Voice message", color = c.text, fontSize = 20.sp, fontWeight = FontWeight.Medium) },
+        text = {
+            when {
+                text != null -> Text(
+                    text, color = c.text, fontSize = 16.sp, lineHeight = 23.sp,
+                    style = TextStyle(textDirection = TextDirection.Content, textAlign = TextAlign.Start),
+                    modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()).testTag("voice-transcript"),
+                )
+                working -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(color = c.brand, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Transcribing… this takes about half the length of the message.", color = c.textSecondary, fontSize = 15.sp)
+                }
+                else -> Text(error ?: "Couldn't transcribe this voice message", color = Color(0xFFEA0038), fontSize = 15.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("transcript-close")) { Text("Close", color = c.brand) }
+        },
+        dismissButton = {
+            when {
+                text != null -> TextButton(
+                    onClick = { clipboard.setText(AnnotatedString(text)); onDismiss() },
+                    modifier = Modifier.testTag("transcript-copy"),
+                ) { Text("Copy", color = c.brand) }
+                !working -> TextButton(onClick = onRetry, modifier = Modifier.testTag("transcript-retry")) { Text("Try again", color = c.brand) }
+            }
+        },
+    )
 }
 
 @Composable
